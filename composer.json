@@ -1,0 +1,63 @@
+{
+    "name": "weboccult/eatcard-reservation",
+    "description": "This package is use of Create new Reservation based on available time slots & meals and also assigned the table accordingly section with different payment gateway method.",
+    "keywords": [
+        "weboccult",
+        "eatcard-reservation"
+    ],
+    "homepage": "https://github.com/weboccult/eatcard-reservation",
+    "license": "MIT",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Vasukumar Mathukiya",
+            "email": "vasum.wot2022@gmail.com",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^7.4|^8.0",
+        "ext-json": "*",
+        "illuminate/support": "^8.0 || ^9.0",
+        "laravel/breeze": "*",
+        "swiftmailer/swiftmailer": "^6.3",
+        "mollie/laravel-mollie": "^2.13",
+        "guzzlehttp/guzzle": "^7.0.1",
+        "symfony/mailer": "^6.1"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^6.0",
+        "phpunit/phpunit": "^9.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Weboccult\\EatcardReservation\\": "src"
+        },
+        "files": [
+            "src/Helper/reservation.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Weboccult\\EatcardReservation\\Tests\\": "tests"
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/phpunit",
+        "test-coverage": "vendor/bin/phpunit --coverage-html coverage"
+
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Weboccult\\EatcardReservation\\EatcardReservationServiceProvider"
+            ],
+            "aliases": {
+                "EatcardReservation": "Weboccult\\EatcardReservation\\EatcardReservationFacade"
+            }
+        }
+    }
+}
