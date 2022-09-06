@@ -73,7 +73,13 @@ class EatcardReservation
         return $this;
     }
 
-    public function getSlotsMonthly($slug,$data){
+	/**
+	 * @param $slug : String
+	 * @param $data : Array
+	 * @return array
+	 * @Description get given store slug slots based on given data
+	 */
+	public function getSlotsMonthly($slug,$data){
 
         $this->store = getStoreBySlug($slug);
 
