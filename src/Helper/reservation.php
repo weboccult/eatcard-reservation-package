@@ -1578,15 +1578,15 @@ function sendResWebNotification($id, $store_id, $channel = '', $oldTables = [], 
                         'socket_origin_client_id' => $socket_origin_client_id
                     ]);
                 }
-//                $redis = \LRedis::connection();
-//                $redis->publish('reservation_booking', json_encode([
-//                    'store_id'        => $store_id,
-//                    'channel'         => $channel,
-//                    'notification_id' => 0,
-//                    'additional_data' => $additionalData,
-//                    'socket_origin_client_id' => $socket_origin_client_id,
-//                    'system_name' => 'Reservation'
-//                ]));
+                $redis = \LRedis::connection();
+                $redis->publish('reservation_booking', json_encode([
+                    'store_id'        => $store_id,
+                    'channel'         => $channel,
+                    'notification_id' => 0,
+                    'additional_data' => $additionalData,
+                    'socket_origin_client_id' => $socket_origin_client_id,
+                    'system_name' => 'Reservation'
+                ]));
             } else if ($channel == 'new_booking') {
                 $additionalData = json_encode([
                     'reservation_id' => $id,
@@ -1601,14 +1601,14 @@ function sendResWebNotification($id, $store_id, $channel = '', $oldTables = [], 
                     'reservation_type' => $reservation->reservation->reservation_type,
                     'is_until' => $reservation->reservation->is_until,
                 ]);
-//                $redis = \LRedis::connection();
-//                $redis->publish('reservation_booking', json_encode([
-//                    'store_id'        => $store_id,
-//                    'channel' => $channel?$channel:'new_booking',
-//                    'notification_id' => 0,
-//                    'additional_data' => $additionalData,
-//                    'system_name' => 'Reservation'
-//                ]));
+                $redis = \LRedis::connection();
+                $redis->publish('reservation_booking', json_encode([
+                    'store_id'        => $store_id,
+                    'channel' => $channel?$channel:'new_booking',
+                    'notification_id' => 0,
+                    'additional_data' => $additionalData,
+                    'system_name' => 'Reservation'
+                ]));
             } else if ($channel && $channel == 'booking_table_change') {
                 $additionalData = json_encode([
                     'reservation_id' => $reservation->reservation->id,
@@ -1624,23 +1624,23 @@ function sendResWebNotification($id, $store_id, $channel = '', $oldTables = [], 
                     'from_time' => $reservation->reservation->from_time,
                     'end_time' => $reservation->reservation->end_time,
                 ]);
-//                $redis = \LRedis::connection();
-//                $redis->publish('reservation_booking', json_encode([
-//                    'store_id' => $store_id,
-//                    'channel' => 'booking_table_change',
-//                    'notification_id' => 0,
-//                    'additional_data' => $additionalData,
-//                    'system_name' => 'Reservation'
-//                ]));
+                $redis = \LRedis::connection();
+                $redis->publish('reservation_booking', json_encode([
+                    'store_id' => $store_id,
+                    'channel' => 'booking_table_change',
+                    'notification_id' => 0,
+                    'additional_data' => $additionalData,
+                    'system_name' => 'Reservation'
+                ]));
             } else {
-//                $redis = \LRedis::connection();
-//                $redis->publish('reservation_booking', json_encode([
-//                    'store_id'        => $store_id,
-//                    'channel' => $channel?$channel:'new_booking',
-//                    'notification_id' => 0,
-//                    'additional_data' => $additionalData,
-//                    'system_name' => 'Reservation'
-//                ]));
+                $redis = \LRedis::connection();
+                $redis->publish('reservation_booking', json_encode([
+                    'store_id'        => $store_id,
+                    'channel' => $channel?$channel:'new_booking',
+                    'notification_id' => 0,
+                    'additional_data' => $additionalData,
+                    'system_name' => 'Reservation'
+                ]));
             }
 
             Log::info('new booking web notification success:');
