@@ -1650,3 +1650,104 @@ function sendResWebNotification($id, $store_id, $channel = '', $oldTables = [], 
         Log::info('New booking web notification error: ' . $e->getMessage() . $e->getLine() . $e->getFile() . ', IP address : ' . request()->ip() . ', browser : ' . request()->header('User-Agent'));
     }
 }
+
+if (!function_exists('getDutchDateTable')) {
+	/**
+	 * @param $date
+	 * @param bool $is_takeaway
+	 * @return string
+	 */
+	function getDutchDateTable($date, $is_takeaway = false)
+	{
+		$dutchDayNames = [
+			'Sunday' => 'zondag',
+			'Monday' => 'maandag',
+			'Tuesday' => 'dinsdag',
+			'Wednesday' => 'woensdag',
+			'Thursday' => 'donderdag',
+			'Friday' => 'vrijdag',
+			'Saturday' => 'zaterdag'
+		];
+		$monthNames = [
+			"January" => "januari",
+			"February" => "februari",
+			"March" => "maart",
+			"April" => "april",
+			"May" => "mei",
+			"June" => "juni",
+			"July" => "juli",
+			"August" => "augustus",
+			"September" => "september",
+			"October" => "oktober",
+			"November" => "november",
+			"December" => "december",
+		];
+
+		if ($is_takeaway) {
+			return $dutchDayNames[Carbon::parse($date)->format('l')] . ' (' .
+				Carbon::parse($date)->format('d') . ' ' .
+				$monthNames[Carbon::parse($date)->format('F')] . ')';
+		}
+		return $dutchDayNames[Carbon::parse($date)->format('l')] . ' ' .
+			Carbon::parse($date)->format('d') . ' ' .
+			$monthNames[Carbon::parse($date)->format('F')];
+	}
+}
+if (!function_exists('getDutchDate')) {
+	/**
+	 * @param $date
+	 * @param bool $day2let
+	 * @return string
+	 */
+	function getDutchDate($date, $day2let = false)
+	{
+		$dutchDayNames = [
+			'Sunday' => 'zondag',
+			'Monday' => 'maandag',
+			'Tuesday' => 'dinsdag',
+			'Wednesday' => 'woensdag',
+			'Thursday' => 'donderdag',
+			'Friday' => 'vrijdag',
+			'Saturday' => 'zaterdag'
+		];
+
+
+		$monthNames = [
+			"January" => "januari",
+			"February" => "februari",
+			"March" => "maart",
+			"April" => "april",
+			"May" => "mei",
+			"June" => "juni",
+			"July" => "juli",
+			"August" => "augustus",
+			"September" => "september",
+			"October" => "oktober",
+			"November" => "november",
+			"December" => "december",
+		];
+		$day = $day2let ? appDutchDay2Letter(Carbon::parse($date)->format('l')) : $dutchDayNames[Carbon::parse($date)->format('l')];
+		return $day . ' ' . Carbon::parse($date)->format('d') . ' ' .
+			$monthNames[Carbon::parse($date)->format('F')] . ' ' .
+			Carbon::parse($date)->format('Y');
+	}
+}
+if (!function_exists('appDutchDay2Letter')) {
+	/**
+	 * @param $day
+	 * @return string
+	 */
+	function appDutchDay2Letter($day)
+	{
+		$dutchDayNames = [
+			'Sunday' => 'Zo',
+			'Monday' => 'Ma',
+			'Tuesday' => 'Di',
+			'Wednesday' => 'Wo',
+			'Thursday' => 'Do',
+			'Friday' => 'Vr',
+			'Saturday' => 'Za'
+		];
+		return $dutchDayNames[$day];
+	}
+}

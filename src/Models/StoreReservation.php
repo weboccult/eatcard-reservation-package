@@ -7,6 +7,8 @@ use Cmgmyr\Messenger\Models\Message;
 use Cmgmyr\Messenger\Models\Thread;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
+use function Weboccult\EatcardReservation\Helper\getDutchDate;
+use function Weboccult\EatcardReservation\Helper\getDutchDateTable;
 
 class StoreReservation extends Model
 {
@@ -134,6 +136,20 @@ class StoreReservation extends Model
 
         });
     }
+
+	public function getResDutchDateAttribute()
+	{
+		return getDutchDateTable($this->res_date);
+	}
+
+	public function getResDateAttribute($value)
+	{
+		return getDutchDate($value);
+	}
+	public function getDutchDateAttribute($value)
+	{
+		return getDutchDateTable($this->created_at);
+	}
 
     public function user()
     {
