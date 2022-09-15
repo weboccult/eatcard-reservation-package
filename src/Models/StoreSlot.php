@@ -4,8 +4,6 @@ namespace Weboccult\EatcardReservation\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Weboccult\EatcardReservation\Models\StoreWeekDay;
-use Illuminate\Support\Facades\Log;
 
 class StoreSlot extends Model
 {

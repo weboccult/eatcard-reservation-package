@@ -18,14 +18,4 @@ class DineinPriceCategory extends Model
     {
         return $this->hasMany(DineinPrices::class, 'dinein_category_id');
     }
-
-    public function ayceSettings()
-    {
-        return $this->hasOne(AllYouCanEatClassSetting::class, 'dinein_category_id');
-    }
-
-    public function dineinAyceHideCategories()
-    {
-        return $this->hasMany(DineinAyceHideCategory::class, 'dinein_category_id');
-    }
 }

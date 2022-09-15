@@ -9,16 +9,21 @@ use Weboccult\EatcardReservation\Classes\Multisafe;
 use Weboccult\EatcardReservation\EatcardReservation;
 use Weboccult\EatcardReservation\Models\CancelReservation;
 use Weboccult\EatcardReservation\Models\DiningArea;
+use Weboccult\EatcardReservation\Models\GiftPurchaseOrder;
 use Weboccult\EatcardReservation\Models\Meal;
 use Weboccult\EatcardReservation\Models\Order;
 use Weboccult\EatcardReservation\Models\ReservationJob;
 use Weboccult\EatcardReservation\Models\ReservationTable;
 use Weboccult\EatcardReservation\Models\Store;
+use Weboccult\EatcardReservation\Models\StoreOwner;
 use Weboccult\EatcardReservation\Models\StoreReservation;
 use Weboccult\EatcardReservation\Models\StoreSlot;
 use Weboccult\EatcardReservation\Models\StoreSlotModified;
 use Weboccult\EatcardReservation\Models\StoreWeekDay;
 use Weboccult\EatcardReservation\Models\Table;
+use Cmgmyr\Messenger\Models\Thread;
+use Cmgmyr\Messenger\Models\Participant;
+use Illuminate\Support\Facades\Redis as LRedis;
 
 
 if (!function_exists('eatcardReservation')) {
@@ -48,13 +53,17 @@ if (!function_exists('specificDateSlots')) {
     /**
      * @param $store
      * @param $specific_date
+     * @param $slot_time
+     * @param $slot_model
      * @return array
+     * @descriptin Fetch the Specific Date Wise Slots only
      */
     function specificDateSlots($store, $specific_date, $slot_time, $slot_model)
     {
         $activeSlots = [];
         $dateMealSlotsData = [];
 
+        //Based on selected date fetch slots
         $dateMealSlotsData = StoreSlotModified::query()
             ->where('store_id', $store->id)
             ->where('is_day_meal', 0)
@@ -121,10 +130,12 @@ if (!function_exists('specificDaySlots')) {
      * @param $store
      * @param null $slot_time
      * @return array
+     * @description Fetch the Selected Specific day wise slots
      */
     function specificDaySlots($store, $slot_time = null)
     {
         $activeSlots = [];
+
         //Specific Day wise slots
         $daySlot = StoreSlot::query()
             ->where('store_id', $store->id)
@@ -147,6 +158,7 @@ if (!function_exists('generalSlots')) {
      * @param $store
      * @param null $slot_time
      * @return array
+     * @Description Fetch the all General sots from admin
      */
     function generalSlots($store, $slot_time = null)
     {
@@ -172,6 +184,7 @@ if (!function_exists('mealSlots')) {
     /**
      * @param $store
      * @return array
+     * @description Fetch on meal available slots
      */
     function mealSlots($store, $slot_time = null)
     {
@@ -227,13 +240,15 @@ if (!function_exists('dataModelSlots')) {
      * @param $data_model
      * @param $slot_id
      * @return \Weboccult\EatcardReservation\Facade\EatcardReservation
+     * @description On specific slot model based return slot
      */
-    function dataModelSlots($data_model, $slot_id)
+    function dataModelSlots($data_model, $from_time, $meal_id)
     {
         //Check store slot and week day wise active or not
         if ($data_model == 'StoreSlot') {
             $slot = StoreSlot::query()
-                ->where('id', $slot_id)
+                ->where('from_time', $from_time)
+                ->where('meal_id', $meal_id)
                 ->first();
             if (isset($slot->store_weekdays_id) && $slot->store_weekdays_id != null) {
                 $store_weekday = StoreWeekDay::query()
@@ -243,49 +258,52 @@ if (!function_exists('dataModelSlots')) {
                     return [
                         'status' => 'error',
                         'error' => 'error_weekday_frame',
-                        ];
+                    ];
                 }
             }
         } else {
             $slot = StoreSlotModified::query()
-                ->where('id', $slot_id)
+                ->where('from_time', $from_time)
+                ->where('meal_id', $meal_id)
                 ->first();
         }
         return $slot;
     }
 }
-if (!function_exists('isValidReservation')){
+if (!function_exists('isValidReservation')) {
     /**
      * @param $data
      * @param $store
      * @param $slot
      * @return bool
+     * @description Check modified slot available or not based on admin setting
      */
-    function isValidReservation($data, $store, $slot) {
+    function isValidReservation($data, $store, $slot)
+    {
 
-        $meal = Meal::where('id', $data['meal_type'])->first();
+        $meal = Meal::query()->where('id', $data['meal_type'])->first();
         $day_meal = ($meal->is_meal_res) ? 1 : 0;
-        $slot_modified = StoreSlotModified::where('store_id', $store->id)
+        $slot_modified = StoreSlotModified::query()->where('store_id', $store->id)
             ->where('store_date', $data['res_date'])
             ->where('from_time', $slot->from_time)
             ->where('is_day_meal', $day_meal)
             ->first();
         if ($slot_modified && $slot_modified->is_available != 1) { // slot time is off for reservation
             return false;
-        }
-        else {
+        } else {
             return true;
         }
     }
 }
 
-if (!function_exists('getAnotherMeetingUsingIgnoringArrangmentTime')) {
+if (!function_exists('getAnotherMeetingUsingIgnoringArrangementTime')) {
     /**
      * @param $reservation
      * @param $item
      * @return bool
+     * @description Check From time with reservation details time
      */
-    function getAnotherMeetingUsingIgnoringArrangmentTime($reservation, $item)
+    function getAnotherMeetingUsingIgnoringArrangementTime($reservation, $item)
     {
         return strtotime($item->from_time) == strtotime($reservation->from_time);
     }
@@ -295,6 +313,7 @@ if (!function_exists('generateRandomNumberV2')) {
     /**
      * @param int $length
      * @return int
+     * @Description Generate Random number value
      */
     function generateRandomNumberV2($length = 4)
     {
@@ -305,12 +324,13 @@ if (!function_exists('generateRandomNumberV2')) {
 if (!function_exists('generateReservationId')) {
     /**
      * @return string
+     * @description Generate Random reservation ID
      */
     function generateReservationId()
     {
         $id = rand(1111111, 9999999);
         $id = (string)$id; //convert it into string because of query optimize, here in db reservation_id datatype is a string
-        $exist = StoreReservation::where('reservation_id', $id)->first();
+        $exist = StoreReservation::query()->where('reservation_id', $id)->first();
         if ($exist) {
             return generateReservationId();
         } else {
@@ -326,6 +346,7 @@ if (!function_exists('createNewReservation')) {
      * @param $data_model
      * @param $store
      * @return array
+     * @description Create a new Reservation with all fetch data
      */
     function createNewReservation($meal, $data, $data_model, $store)
     {
@@ -368,6 +389,7 @@ if (!function_exists('createNewReservation')) {
             }
             //Create entry in reservation job table
             $reservation_job = ReservationJob::query()->create($reservation_data);
+            StoreReservation::query()->where('id', $storeNewReservation->id)->update(['gift_card_code' => $data['qr_code']]);
 
             //Get Reservation Status Check
             Log::info("Get reservation status check - start");
@@ -376,7 +398,7 @@ if (!function_exists('createNewReservation')) {
             for ($i = 0; $i < 5; $i++) {
                 $reservationJobTotalCount = ReservationJob::query()->where('id', $reservation_job->id)->count();
                 Log::info("Reservation Job Total Count number : " . $reservationJobTotalCount);
-                if($reservationJobTotalCount > 0) {
+                if ($reservationJobTotalCount > 0) {
                     sleep($reservationStatusArrayCheck[$i]);
                 } else {
                     break;
@@ -386,16 +408,16 @@ if (!function_exists('createNewReservation')) {
             do {
                 Log::info('do while start for : Reservation Status');
                 $storeNewReservation = StoreReservation::query()->where('id', $storeNewReservation->id)->first();
-                if($storeNewReservation->res_status != null) {
+                if ($storeNewReservation->res_status != null) {
                     $count = 4;
                 } else {
                     sleep(3);
                     $count++;
                 }
-            } while(($storeNewReservation->res_status == null || $storeNewReservation->res_status == '') && $count <= 3);
+            } while (($storeNewReservation->res_status == null || $storeNewReservation->res_status == '') && $count <= 3);
             Log::info('do while end for : Reservation Status');
 
-            if($storeNewReservation->res_status == null || $storeNewReservation->res_status == '') {
+            if ($storeNewReservation->res_status == null || $storeNewReservation->res_status == '') {
                 Log::info('storeNewReservation->res_status is null : Reservation ID ' . $storeNewReservation->id);
                 StoreReservation::query()->where('id', $storeNewReservation->id)->update(['status' => 'declined', 'is_manually_cancelled' => 2]);
                 return [
@@ -405,8 +427,8 @@ if (!function_exists('createNewReservation')) {
                     'code' => 400
                 ];
             }
-            if($storeNewReservation->res_status != '' && $storeNewReservation->res_status != null) {
-                if($storeNewReservation->res_status == 'failed') {
+            if ($storeNewReservation->res_status != '' && $storeNewReservation->res_status != null) {
+                if ($storeNewReservation->res_status == 'failed') {
                     Log::info('storeNewReservation->res_status is failed : Reservation ID ' . $storeNewReservation->id);
                     StoreReservation::query()->where('id', $storeNewReservation->id)->update(['status' => 'declined', 'is_manually_cancelled' => 2]);
                     return [
@@ -427,38 +449,62 @@ if (!function_exists('createNewReservation')) {
 
             Log::info("Socket for New Reservation");
             //Publish socket for new reservation
-            if(!$meal->price && $meal->payment_type != 1 && $meal->payment_type != 3) {
+            if (!$meal->price && $meal->payment_type != 1 && $meal->payment_type != 3) {
                 sendResWebNotification($storeNewReservation->id, $storeNewReservation->store_id);
             } else {
                 sendResWebNotification($storeNewReservation->id, $storeNewReservation->store_id);
             }
+            Log::info("sendResWebNotification END ");
 
-            $thread = $this->thread_model->create([
+            $thread = Thread::query()->create([
                 'subject' => 'reservation'
             ]);
             $storeNewReservation->update(['thread_id' => $thread->id]);
             $ownerId = ($storeNewReservation->store) ? $storeNewReservation->store->created_by : 0;
-            $owner = $this->store_owner_model->where('store_id', $storeNewReservation->store_id)->first();
+            $owner = StoreOwner::query()->where('store_id', $storeNewReservation->store_id)->first();
             if ($owner) {
                 $ownerId = $owner->user_id;
             }
-            $this->participant_model->insert([
+            Participant::query()->insert([
                 [
-                    'thread_id'  => $thread->id,
-                    'user_id'    => $storeNewReservation->user_id ? $storeNewReservation->user_id : 0,
-                    'last_read'  => Carbon::now(),
+                    'thread_id' => $thread->id,
+                    'user_id' => $storeNewReservation->user_id ? $storeNewReservation->user_id : 0,
+                    'last_read' => Carbon::now(),
                     'created_at' => Carbon::now(),
                     'updated_at' => Carbon::now(),
                 ],
                 [
-                    'thread_id'  => $thread->id,
-                    'user_id'    => $ownerId,
-                    'last_read'  => Carbon::now(),
+                    'thread_id' => $thread->id,
+                    'user_id' => $ownerId,
+                    'last_read' => Carbon::now(),
                     'created_at' => Carbon::now(),
                     'updated_at' => Carbon::now(),
                 ]
             ]);
-            $reservation_job->update(['reservation_id'=>$data['reservation_id']]);
+            $reservation_job->update(['reservation_id' => $data['reservation_id']]);
+
+            if(isset($data['total_price'])){
+                if ($storeNewReservation->res_status == 'success' && $data['total_price'] == 0) {
+                    Log::info("Reservation status success and total price zero then payment url null in response");
+                    $data['payment_method_type'] = '';
+                    $data['method'] = '';
+                }
+            }
+
+            if($storeNewReservation->res_status == 'success' && isset($data['qr_code'])){
+                //Fetch the Applied gift card details for calculation
+                $giftCardPrice = GiftPurchaseOrder::query()
+                    ->where('qr_code', $data['qr_code'])
+                    ->whereDate('expire_at', '>', Carbon::now()->toDateString())
+                    ->first();
+                $totalPrice = 0;
+                if (($giftCardPrice->is_multi_usage) == 1) {
+                    $totalPrice = (float)$giftCardPrice->remaining_price - (float)$meal->price;
+                }
+                Log::info("Updated remaining price : " . $totalPrice);
+                $giftCardPrice->update(['remaining_price' => $totalPrice]);
+            }
+
             //Payment method type and method defines with cancel,notify and redirect URL
             if ($data['payment_method_type'] && $data['method'] && ($meal->payment_type == 1 || $meal->payment_type == 3) && $meal->price) {
                 try {
@@ -504,13 +550,12 @@ if (!function_exists('createNewReservation')) {
                         $payment = $multisafe->postOrder($store->multiSafe->api_key, $data);
                     }
 
-
                 } catch (\Exception $e) {
                     Log::info('Booking reservation mollie error Message: => ' . json_encode($e->getMessage()) . ', Line : =>' . json_encode($e->getLine()));
-                    return ['status' => 'error', 'message' => 'something_wrong_payment'];
+                    return ['status' => 'error', 'message' => 'something_wrong_payment', 'error' => 'something_wrong_payment'];
                 }
-            }elseif($data['payment_method_type'] == null && $data['method'] == null){
-                $new_reservation_data['payment_url'] = null;
+            } elseif ($data['payment_method_type'] == '' && $data['method'] == '') {
+                $payment['payment_url'] = '';
             }
             $new_reservation_data['id'] = $storeNewReservation->id;
             $new_reservation_data['payment'] = true;
@@ -525,18 +570,19 @@ if (!function_exists('currentMonthDisabledDatesList')) {
      * @param $store
      * @param $current_month_str
      * @return array
+     * @description Fetch the current month disable date list array
      */
     function currentMonthDisabledDatesList($store, $current_month_str)
     {
 
         //disable date list for manually disabled admin
-        $currentDateAvabality = StoreSlotModified::query()
+        $currentDateAvailability = StoreSlotModified::query()
             ->where('store_id', $store->id)
             ->where('is_day_meal', 0)
             ->where('is_available', 0)
             ->whereRaw('MONTH(store_date) = ?', $current_month_str)
             ->get();
-        $getDates = $currentDateAvabality->pluck('store_date')->toArray();
+        $getDates = $currentDateAvailability->pluck('store_date')->toArray();
 
         $currentMonthDisabledDates = [];
 
@@ -554,15 +600,15 @@ if (!function_exists('currentMonthDisabledDatesList')) {
 
             if (isset($current_month_str) && $current_month_str != "") {
                 //Specific slots modified in admin
-                $manualMnthGetDates = StoreSlotModified::query()
+                $manualMonthGetDates = StoreSlotModified::query()
                     ->where('store_id', $store->id)
                     ->where('is_available', 0)
                     ->where('is_day_meal', 0)
                     ->whereRaw('MONTH(store_date) = ?', $current_month_str)
                     ->pluck('store_date');
             }
-            if (isset($manualMnthGetDates) && count($manualMnthGetDates) > 0) {
-                foreach ($manualMnthGetDates as $getDate) {
+            if (isset($manualMonthGetDates) && count($manualMonthGetDates) > 0) {
+                foreach ($manualMonthGetDates as $getDate) {
                     $currentMonthDisabledDates[] = $getDate;
                 }
             }
@@ -582,6 +628,7 @@ if (!function_exists('disableDayByAdmin')) {
      * @param $store
      * @param $current_month_str
      * @return array
+     * @description Disable day from admin setting
      */
     function disableDayByAdmin($store, $current_month_str)
     {
@@ -608,6 +655,7 @@ if (!function_exists('weekOffDay')) {
      * @param $current_month_str
      * @param $current_year_str
      * @return array
+     * @description check the every weekly off day
      */
     function weekOffDay($store, $current_month_str, $current_year_str)
     {
@@ -643,10 +691,12 @@ if (!function_exists('weekOffDay')) {
 
 if (!function_exists('modifiedSlots')) {
     /**
+     * @param $store
      * @param $current_month_str
      * @return array
+     * @description Fetch only Modified slots
      */
-    function modifiedSlots($store,$current_month_str)
+    function modifiedSlots($store, $current_month_str)
     {
         //Slot modified available on date or day
         $modified_slots = StoreSlotModified::query()
@@ -662,7 +712,7 @@ if (!function_exists('modifiedSlots')) {
         foreach ($modified_slots as $key => $slot) {
             $modified_slots[$key] = Carbon::parse($slot)->format('Y-m-d');
         }
-        Log::info("Modified Slots Date : ",$modified_slots);
+        Log::info("Modified Slots Date : ", $modified_slots);
         return $modified_slots;
     }
 }
@@ -673,6 +723,7 @@ if (!function_exists('getNextEnableDates')) {
      * @param $date
      * @param $days
      * @return mixed
+     * @description Fetch the next first enable date from available dates
      */
     function getNextEnableDates($availDates, $date, $days)
     {
@@ -691,6 +742,7 @@ if (!function_exists('superUnique')) {
      * @param $array
      * @param $key
      * @return array
+     * @description Fetch the Super Unique value from defined specific field
      */
     function superUnique($array, $key)
     {
@@ -709,6 +761,7 @@ if (!function_exists('getStoreBySlug')) {
     /**
      * @param $store_slug
      * @return \Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Eloquent\Model|object|null
+     * @description Fetch the store from store slug
      */
     function getStoreBySlug($store_slug)
     {
@@ -726,6 +779,7 @@ if (!function_exists('getActiveMeals')) {
      * @param $slot_time
      * @param $person
      * @return array
+     * @description Get only active meals based on slot
      */
     function getActiveMeals($slotAvailableMeals, $specific_date, $store_id, $slot_time, $person)
     {
@@ -825,11 +879,13 @@ if (!function_exists('getDisable')) {
      * @param $person
      * @param $slot_active_meals
      * @param $store
+     * @param $slot_time
      * @return string
+     * @discription Return disable for meal function show or hide
      */
-    function getDisable($store_id, $specific_date, $person, $slot_active_meals, $store)
+    function getDisable($store_id, $specific_date, $person, $slot_active_meals, $store, $slot_time)
     {
-        $disable = '';
+        $disable = true;
         //Reservation check here for limit of person based on available reservation
         $res_id = 0;
         $check_all_reservation = StoreReservation::query()
@@ -872,37 +928,23 @@ if (!function_exists('getDisable')) {
                 $time_limit_of_reservation = [];
                 foreach ($check_all_reservation as $reservation) {
 
-                    //If not found end time then use this loop
-                    if (!$reservation->end_time) {
-                        $time_limit_of_reservation = ($reservation->meal && $reservation->meal->time_limit) ? $reservation->meal->time_limit : 120;
-                        $reservation->end_time = Carbon::parse($reservation->from_time)
-                            ->addMinutes($time_limit_of_reservation)
-                            ->format('H:i');
-                    }
-
                     //If not set time limit of meal then auto set 120 minutes for it.
-                    $meals = $slot_active_meals;
-                    foreach ($meals as $meal) {
-                        if (!isset($meal->time_limit)) {
-                            $time_limit_of_reservation[] = ($meal->time_limit) ? $meal->time_limit : 120;
-                        }
-                    }
+                    $meal = $slot_active_meals;
+                    $time_limit_of_reservation = (isset($meal->time_limit) && $meal->time_limit) ? $meal->time_limit : 120;
 
                     //Slot End Time of the
-                    $end_time = Carbon::parse($reservation->from_time)
+                    $end_time = Carbon::parse($slot_time)
                         ->addMinutes($time_limit_of_reservation)
                         ->format('H:i');
                     if ($end_time == '00:00') {
                         $end_time = '24:00';
-                    } elseif (strtotime($end_time) < strtotime($reservation->from_time)) {
+                    } elseif (strtotime($end_time) < strtotime($slot_time)) {
                         $end_time = '24:00';
                     }
-
                     $another_meeting =
-                        (strtotime($reservation->from_time) > strtotime($reservation->from_time) && strtotime($reservation->from_time) < strtotime($reservation->end_time)) ||
-                        (strtotime($reservation->from_time) > strtotime($reservation->from_time) && strtotime($reservation->from_time) < strtotime($end_time)) ||
-                        (strtotime($reservation->from_time) == strtotime($reservation->from_time));
-
+                        (strtotime($slot_time) > strtotime($reservation->from_time) && strtotime($slot_time) < strtotime($reservation->end_time)) ||
+                        (strtotime($reservation->from_time) > strtotime($slot_time) && strtotime($reservation->from_time) < strtotime($end_time)) ||
+                        (strtotime($slot_time) == strtotime($reservation->from_time));
                     if ($another_meeting) {
                         foreach ($reservation->tables as $table) {
                             $table_assign[] = $table->table_id;
@@ -914,26 +956,27 @@ if (!function_exists('getDisable')) {
                 Log::info("Reservation : Available Table List - " . json_encode($available_table_list));
                 if (!$available_table_list) {
                     $disable = 'true';
+                    return $disable;
                 }
-                $table_availablity = false;
+                $table_availability = false;
                 foreach ($available_table_list as $empty_table) {
                     $empty_table_data = $tables->where('id', $empty_table)->first();
                     $person_seat_range = range($empty_table_data->no_of_min_seats, $empty_table_data->no_of_seats);
 
                     if (in_array($person, $person_seat_range)) {
-                        $table_availablity = true;
-                    } else if (!$table_availablity) {
+                        $table_availability = true;
+                    } else if (!$table_availability) {
                         $disable = "true";
                     }
                 }
 
                 $get_section = DiningArea::query()
                     ->with(['tables' => function ($q1) use ($available_table_list, $person) {
-                            $q1->whereIn('id', $available_table_list)
-                                ->where('online_status', 1)
-                                ->where('status', 1)
-                                ->where('no_of_seats', '<=', $person);
-                        }
+                        $q1->whereIn('id', $available_table_list)
+                            ->where('online_status', 1)
+                            ->where('status', 1)
+                            ->where('no_of_seats', '<=', $person);
+                    }
                     ])->where('store_id', $store->id)->where('status', 1);
                 if ($section_id != null) {
                     $get_section = $get_section->where('id', $section_id);
@@ -975,18 +1018,19 @@ if (!function_exists('getDisable')) {
     }
 }
 
-if(!function_exists('tableAssign')) {
+if (!function_exists('tableAssign')) {
     /**
-     * @param $newReservationDetail
-     * @param $data
-     * @param $store
-     * @param $reservation_check_attempt
-     * @param $newReservationStatus
+     * @param $dataFromCron
      * @return mixed
+     * @description Auto assigned table on cron
      */
-    function tableAssign($newReservationDetail, $data, $store, $reservation_check_attempt, $newReservationStatus)
+    function tableAssign($dataFromCron)
     {
-
+        $newReservationDetail = $dataFromCron['new_reservation_details'];
+        $data = $dataFromCron['payload'];
+        $store = $dataFromCron['store'];
+        $reservation_check_attempt = $dataFromCron['reservation_check_attempt'];
+        $newReservationStatus = $dataFromCron['reservation_status'];
         $meal = Meal::query()->findOrFail($data['meal_type']);
         $availableSeats = [];
         $table_ids = [];
@@ -1004,7 +1048,7 @@ if(!function_exists('tableAssign')) {
             $reservedTables = getReservationTables($data, $start_time, $end_time);
             Log::info('Get already reserved tables : ' . json_encode($reservedTables));
 
-            $availableTables = getAvailableTables($data, $reservedTables);
+            $availableTables = getAvailableTables($data, $reservedTables, $data['section_id']);
             Log::info('(With out payment) Get Available tables : ' . json_encode($availableTables));
 
             if ($availableTables->count() && $store->is_table_mgt_enabled == 1) {
@@ -1031,14 +1075,18 @@ if(!function_exists('tableAssign')) {
                         $availableTables = $availableTables->pluck('id')->toArray();
                         /*get available tables section wise*/
                         $reservation_person = $data['person'];
-                        $sections = DiningArea::with([
+                        $sectionsDetails = DiningArea::with([
                             'tables' => function ($q1) use ($availableTables, $reservation_person) {
                                 $q1->whereIn('id', $availableTables)
                                     ->where('online_status', 1)
                                     ->where('status', 1)
                                     ->where('no_of_seats', '<=', $reservation_person);
                             }
-                        ])->where('status', 1)->where('store_id', $store->id)->get();
+                        ])->where('status', 1)->where('store_id', $store->id);
+                        if ($data['section_id'] != null) {
+                            $sectionsDetails = $sectionsDetails->where('id', $data['section_id']);
+                        }
+                        $sections = $sectionsDetails->get();
                         foreach ($sections as $key => $section) {
                             $storeTablesList = [];
                             $totalValue = 0;
@@ -1072,7 +1120,7 @@ if(!function_exists('tableAssign')) {
                                     }
                                 }
                             } catch (\Exception $e) {
-                                Log::error("Auto assigned table cron : ". 'Message | ' . $e->getMessage() . 'File | ' . $e->getFile(). 'Line | ' . $e->getLine());
+                                Log::error("Auto assigned table cron : " . 'Message | ' . $e->getMessage() . 'File | ' . $e->getFile() . 'Line | ' . $e->getLine());
                             }
                         }
                     } else {
@@ -1104,9 +1152,8 @@ if(!function_exists('tableAssign')) {
         if (isset($data['group_id'])) {
             StoreReservation::query()->where('id', $newReservationDetail->reservation_id)->update(['group_id' => $data['group_id']]);
         }
-        $idStoreReservation = StoreReservation::query()->where('reservation_id', $newReservationDetail->reservation_id)->firstOrFail('id');
         Log::info('Table ids : ' . json_encode($table_ids));
-        $storeReservationId = StoreReservation::query()->where('reservation_id', $newReservationDetail->reservation_id)->firstOrFail();
+        $storeReservationId = StoreReservation::query()->where('id', $newReservationDetail->reservation_id)->firstOrFail();
         if ($table_ids) {
             foreach ($table_ids[0] as $table_id) {
                 Log::info('Assign table to reservation');
@@ -1132,47 +1179,49 @@ if(!function_exists('tableAssign')) {
     }
 }
 
-if (!function_exists('getReservationTables')){
+if (!function_exists('getReservationTables')) {
     /**
      * @param $reservation
      * @param $start_time
      * @param $end_time
      * @return array
+     * @description Fetch all the reserved table id list
      */
-    function getReservationTables($reservation, $start_time, $end_time) {
-    $table_ids = [];
-    $add_new_start_time = \Carbon\Carbon::parse($start_time)->addMinutes(1)->format('H:i');
-    if($end_time < $add_new_start_time) {
-        $end_time = '24:00';
+    function getReservationTables($reservation, $start_time, $end_time)
+    {
+        $table_ids = [];
+        $add_new_start_time = \Carbon\Carbon::parse($start_time)->addMinutes(1)->format('H:i');
+        if ($end_time < $add_new_start_time) {
+            $end_time = '24:00';
+        }
+        //Check table availability seated and fetch table id list
+        ReservationTable::query()->leftJoin('store_reservations', 'store_reservations.id', '=', 'reservation_tables.reservation_id')
+            ->whereNotIn('store_reservations.status', [
+                'declined',
+                'cancelled'
+            ])
+            ->where('store_reservations.is_checkout', '<>', 1)
+            ->where('store_reservations.is_seated', '!=', 2)
+            ->whereIn('store_reservations.payment_status', ['paid', '', 'pending'])
+            ->whereDate('store_reservations.res_date', $reservation['res_date'])
+            ->where('store_reservations.store_id', $reservation['store_id'])
+            ->chunk(200, function ($reseravtions) use (&$table_ids, $start_time, $end_time, $add_new_start_time) {
+                foreach ($reseravtions as $reservation) {
+                    if ($reservation['end_time'] < $reservation['from_time']) {
+                        $reservation['end_time'] = '24:00';
+                    }
+                    if ((strtotime($reservation['from_time']) <= strtotime($start_time) && strtotime($reservation['end_time']) > strtotime($add_new_start_time)) ||
+                        (strtotime($reservation['from_time']) < strtotime($end_time) && strtotime($reservation['end_time']) >= strtotime($end_time)) ||
+                        (strtotime($reservation['from_time']) >= strtotime($start_time) && strtotime($reservation['end_time']) <= strtotime($end_time)) ||
+                        (!is_null($reservation['checked_in_at']) && $reservation['is_checkout'] != 1 &&
+                            $reservation['end_time'] == date('H:i') && strtotime($reservation['end_time']) > strtotime($add_new_start_time))) {
+                        $table_ids[] = $reservation['table_id'];
+                    }
+                }
+            });
+        $table_ids = array_unique($table_ids);
+        return $table_ids;
     }
-    //Check table availability seated and fetch table id list
-    ReservationTable::query()->leftJoin('store_reservations', 'store_reservations.id', '=', 'reservation_tables.reservation_id')
-        ->whereNotIn('store_reservations.status', [
-            'declined',
-            'cancelled'
-        ])
-        ->where('store_reservations.is_checkout', '<>', 1)
-        ->where('store_reservations.is_seated', '!=', 2)
-        ->whereIn('store_reservations.payment_status', ['paid', '', 'pending'])
-        ->whereDate('store_reservations.res_date', $reservation['res_date'])
-        ->where('store_reservations.store_id', $reservation['store_id'])
-        ->chunk(200, function($reseravtions) use(&$table_ids,$start_time, $end_time, $add_new_start_time) {
-            foreach ($reseravtions as $reservation) {
-                if($reservation['end_time'] < $reservation['from_time']) {
-                    $reservation['end_time'] = '24:00';
-                }
-                if((strtotime($reservation['from_time']) <= strtotime($start_time) && strtotime($reservation['end_time']) > strtotime($add_new_start_time)) ||
-                    (strtotime($reservation['from_time']) < strtotime($end_time) && strtotime($reservation['end_time']) >= strtotime($end_time)) ||
-                    (strtotime($reservation['from_time']) >= strtotime($start_time) && strtotime($reservation['end_time']) <= strtotime($end_time)) ||
-                    (!is_null($reservation['checked_in_at']) && $reservation['is_checkout'] != 1 &&
-                        $reservation['end_time'] == date('H:i') && strtotime($reservation['end_time']) > strtotime($add_new_start_time))) {
-                    $table_ids[] = $reservation['table_id'];
-                }
-            }
-        });
-    $table_ids = array_unique($table_ids);
-    return $table_ids;
-}
 }
 
 if (!function_exists('getAvailableTables')) {
@@ -1182,16 +1231,19 @@ if (!function_exists('getAvailableTables')) {
      * @return mixed
      * @Description get available tables for given stores
      */
-    function getAvailableTables($reservation, $reservedTables)
+    function getAvailableTables($reservation, $reservedTables, $section_id = null)
     {
-        return Table::query()
-            ->select('tables.*')
+        Log::info('If selected then Section id : ' . $section_id);
+        return Table::select('tables.*')
             ->leftJoin('dining_areas', 'dining_areas.id', '=', 'tables.dining_area_id')
             ->where('tables.online_status', 1)
             ->where('tables.status', 1)
             ->where('dining_areas.status', 1)
             ->where('dining_areas.is_automatic', 1)
             ->where('dining_areas.store_id', $reservation['store_id'])
+            ->when(!empty($section_id), function ($q1) use ($section_id) {
+                $q1->where('dining_areas.id', $section_id);
+            })
             ->whereNotIn('tables.id', $reservedTables)
             ->get();
     }
@@ -1201,20 +1253,26 @@ if (!function_exists('reservedTimeSlot')) {
     /**
      * @param $store_id
      * @param $specific_date
-     * @param $slot_active_meals
+     * @param $meal
      * @param $person
      * @param $store
      * @param $disable
-     * @Description Fetch reserved time slot
+     * @param $data
      * @return array
+     * @Description Fetch reserved time slot
      */
-    function reservedTimeSlot($store_id, $specific_date, $slot_active_meals, $person, $store, $disable)
+    function remainingSeatCheckDisable($store_id, $specific_date, $meal, $person, $store, $disable, $data)
     {
         $time_slot = [];
         $sections = DiningArea::query()
             ->where('store_id', $store_id)
-            ->where('status', 1)
-            ->get();
+            ->where('status', 1);
+
+        if ($data['section_id'] != null) {
+            $sections = $sections->where('dining_areas.id', $data['section_id']);
+        }
+        $sections = $sections->get();
+
         if ($store->is_table_mgt_enabled == 1 && $sections->count() > 0) {
             $total_seat = 0;
             foreach ($sections as $section) {
@@ -1225,10 +1283,10 @@ if (!function_exists('reservedTimeSlot')) {
                 }
             }
 
-            $slot_disabled = true;
             $without_table_person = 0;
             $with_table_person = 0;
             $res_id = 0;
+            //Check the all reservation which local payment status paid, pending or null
             $check_all_reservation = StoreReservation::query()
                 ->with('tables.table.diningArea', 'meal')
                 ->where('store_id', $store_id)
@@ -1240,14 +1298,6 @@ if (!function_exists('reservedTimeSlot')) {
                 })
                 ->where('is_seated', '!=', 2)
                 ->get();
-
-            $meals = $slot_active_meals;
-            $meal = '';
-            foreach ($meals as $meal) {
-                if (!isset($meal->time_limit)) {
-                    $time_limit_of_reservation[] = ($meal->time_limit) ? $meal->time_limit : 120;
-                }
-            }
 
             foreach ($check_all_reservation as $reservation) {
                 $item = $reservation;
@@ -1264,7 +1314,7 @@ if (!function_exists('reservedTimeSlot')) {
                     }
                 }
                 $remain_seats = $total_seat - $with_table_person - $without_table_person;
-//                Log::info("Reservation : Remaining Seats - " . json_encode($remain_seats));
+
                 if ($remain_seats >= $person) {
                     foreach ($sections as $section) {
                         $section_wise_seat = 0;
@@ -1289,23 +1339,16 @@ if (!function_exists('reservedTimeSlot')) {
                         }
                         $remaining_seat = $section_wise_seat - $reservation_seat;
                         if ($remaining_seat >= $person) {
-                            $slot_disabled = false;
-                            break;
+                            $disable = false;
+                            return ['disable' => $disable];
                         }
                     }
                 } elseif ($remain_seats < $person) {
                     $disable = 'true';
                 }
-                if ($slot_disabled) {
-                    $disable = 'true';
-                }
             }
-            foreach ($check_all_reservation as $pick) {
-                $time_slot[] = $pick->from_time;
-            }
-            Log::info("Reservation : Already Reservation slot list - " . json_encode($time_slot));
         }
-        return ['disable' => $disable, 'time_slot' => $time_slot];
+        return ['disable' => $disable];
     }
 }
 
@@ -1315,6 +1358,7 @@ if (!function_exists('getAnotherMeeting')) {
      * @param $meal
      * @param $item
      * @return bool
+     * @description To check the reserved time for next reservation available or not
      */
     function getAnotherMeeting($reservation, $meal, $item)
     {
@@ -1343,6 +1387,7 @@ if (!function_exists('bestsum')) {
      * @param $data
      * @param $maxsum
      * @return array|mixed
+     * @description To calculate the time
      */
     function bestsum($data, $maxsum)
     {
@@ -1381,10 +1426,10 @@ if (!function_exists('bestsum')) {
  * @return bool
  * @Description create new Reservation then show in planner
  */
-function sendResWebNotification($id, $store_id, $channel='', $oldTables = [], $socket_origin_client_id = null)
+function sendResWebNotification($id, $store_id, $channel = '', $oldTables = [], $socket_origin_client_id = null)
 {
     try {
-        Log::info('in sendResWebNotification called : Socket');
+        Log::info('in sendResWebNotification start : Socket');
         /*Web notification*/
         $reservation = ReservationTable::query()->whereHas('reservation', function ($q) use ($store_id) {
             $q/*->whereHas('meal')*/ ->whereIn('status', ['approved', 'pending', 'cancelled', 'declined']);
@@ -1409,7 +1454,7 @@ function sendResWebNotification($id, $store_id, $channel='', $oldTables = [], $s
             }
         ])->where('reservation_id', $id)->first();
 
-        if($reservation && $reservation->reservation) {
+        if ($reservation && $reservation->reservation) {
             $reservation->reservation->end = 120;
             if ($reservation->reservation->is_dine_in || $reservation->reservation->is_qr_scan) {
                 $orders = Order::with('orderItems.product:id,image,sku')
@@ -1429,20 +1474,17 @@ function sendResWebNotification($id, $store_id, $channel='', $oldTables = [], $s
                 $start = Carbon::parse($reservation->reservation->from_time)->format('H:i');
                 $reservation->reservation->end = Carbon::parse($reservation->reservation->end_time)
                     ->diffInMinutes($start);
-            }
-            elseif (isset($reservation->reservation->meal)) {
+            } elseif (isset($reservation->reservation->meal)) {
                 $reservation->reservation->end = $reservation->reservation->meal->time_limit;
             }
             if (isset($reservation->reservation->user) && $reservation->reservation->user != null && isset($reservation->reservation->user->profile_img) && file_exists(public_path($reservation->reservation->user->profile_img))) {
                 $reservation->reservation->user_profile_image = isset($reservation->reservation->user->profile_img) ? asset($reservation->reservation->user->profile_img) : asset('asset_new/app/media/img/users/user4.jpg');
-            }
-            else {
+            } else {
                 //						$reservation->reservation->user_profile_image = asset('asset_new/app/media/img/users/user4.jpg');
             }
             if ($reservation->reservation->voornaam || $reservation->reservation->achternaam) {
                 $reservation->reservation->img_name = strtoupper(mb_substr($reservation->reservation->voornaam, 0, 1) . mb_substr($reservation->reservation->achternaam, strrpos($reservation->reservation->achternaam, ' '), 1));
-            }
-            else {
+            } else {
                 $reservation->reservation->img_name = 'G';
             }
             $reservation->reservation->unread_msg = false;
@@ -1456,7 +1498,7 @@ function sendResWebNotification($id, $store_id, $channel='', $oldTables = [], $s
             if (isset($reservation->reservation->tables) && $reservation->reservation->tables->count() > 0) {
                 $tables = [];
                 foreach ($reservation->reservation->tables as $table) {
-                    if($table->table) {
+                    if ($table->table) {
                         $tables[] = $table->table->name;
                     }
                 }
@@ -1466,8 +1508,7 @@ function sendResWebNotification($id, $store_id, $channel='', $oldTables = [], $s
             $last_message = null;
             if ($last_message) {
                 $reservation->reservation->last_message = $last_message->body;
-            }
-            else {
+            } else {
                 $reservation->reservation->last_message = null;
             }
             $tempReservation = $reservation->toArray();
@@ -1485,11 +1526,11 @@ function sendResWebNotification($id, $store_id, $channel='', $oldTables = [], $s
                 'dinein_area_id' => $dinein_area_id,
                 'socket_origin_client_id' => $socket_origin_client_id
             ]);
-            $channel = $channel?$channel:'new_booking';
+            $channel = $channel ? $channel : 'new_booking';
             $table_ids = ReservationTable::query()->where('reservation_id', $id)->pluck('table_id')->toArray();
             if ($channel && ($channel == 'checkin' || $channel == 'remove_booking' || $channel == 'payment_status_update')) {
-                Log::info('double inn'. json_encode($tempReservation));
-                if($channel == 'remove_booking') {
+                Log::info('double inn' . json_encode($tempReservation));
+                if ($channel == 'remove_booking') {
                     $start = Carbon::parse($reservation->from_time)->format('H:i');
                     $end = Carbon::parse($reservation->end_time)->diffInMinutes($start);
                     $additionalData = json_encode([
@@ -1514,8 +1555,7 @@ function sendResWebNotification($id, $store_id, $channel='', $oldTables = [], $s
                         'dinein_area_id' => $dinein_area_id,
                         'socket_origin_client_id' => $socket_origin_client_id
                     ]);
-                }
-                elseif ($channel == 'payment_status_update') {
+                } elseif ($channel == 'payment_status_update') {
                     $additionalData = json_encode([
                         'reservation_id' => $id,
                         'socket_origin_client_id' => $socket_origin_client_id,
@@ -1530,26 +1570,24 @@ function sendResWebNotification($id, $store_id, $channel='', $oldTables = [], $s
                         'multisafe_payment_id' => $reservation->reservation->multisafe_payment_id,
                         'mollie_payment_id' => $reservation->reservation->mollie_payment_id,
                     ]);
-                }
-                else {
+                } else {
                     $additionalData = json_encode([
                         'reservation_id' => $id,
-                        'reservation'    => $tempReservation,
+                        'reservation' => $tempReservation,
                         'dinein_area_id' => $dinein_area_id,
                         'socket_origin_client_id' => $socket_origin_client_id
                     ]);
                 }
-                $redis = \LRedis::connection();
-                $redis->publish('reservation_booking', json_encode([
-                    'store_id'        => $store_id,
-                    'channel'         => $channel,
-                    'notification_id' => 0,
-                    'additional_data' => $additionalData,
-                    'socket_origin_client_id' => $socket_origin_client_id,
-                    'system_name' => 'Reservation'
-                ]));
-            }
-            else if ($channel == 'new_booking') {
+//                $redis = \LRedis::connection();
+//                $redis->publish('reservation_booking', json_encode([
+//                    'store_id'        => $store_id,
+//                    'channel'         => $channel,
+//                    'notification_id' => 0,
+//                    'additional_data' => $additionalData,
+//                    'socket_origin_client_id' => $socket_origin_client_id,
+//                    'system_name' => 'Reservation'
+//                ]));
+            } else if ($channel == 'new_booking') {
                 $additionalData = json_encode([
                     'reservation_id' => $id,
                     'socket_origin_client_id' => $socket_origin_client_id,
@@ -1561,18 +1599,17 @@ function sendResWebNotification($id, $store_id, $channel='', $oldTables = [], $s
                     'is_seated' => $reservation->reservation->is_seated,
                     'all_tables' => isset($reservation->reservation->all_tables) ? $reservation->reservation->all_tables : [],
                     'reservation_type' => $reservation->reservation->reservation_type,
-                    'is_until'=> $reservation->reservation->is_until,
+                    'is_until' => $reservation->reservation->is_until,
                 ]);
-                $redis = \LRedis::connection();
-                $redis->publish('reservation_booking', json_encode([
-                    'store_id'        => $store_id,
-                    'channel' => $channel?$channel:'new_booking',
-                    'notification_id' => 0,
-                    'additional_data' => $additionalData,
-                    'system_name' => 'Reservation'
-                ]));
-            }
-            else if ($channel && $channel == 'booking_table_change') {
+//                $redis = \LRedis::connection();
+//                $redis->publish('reservation_booking', json_encode([
+//                    'store_id'        => $store_id,
+//                    'channel' => $channel?$channel:'new_booking',
+//                    'notification_id' => 0,
+//                    'additional_data' => $additionalData,
+//                    'system_name' => 'Reservation'
+//                ]));
+            } else if ($channel && $channel == 'booking_table_change') {
                 $additionalData = json_encode([
                     'reservation_id' => $reservation->reservation->id,
                     'socket_origin_client_id' => $socket_origin_client_id,
@@ -1587,30 +1624,29 @@ function sendResWebNotification($id, $store_id, $channel='', $oldTables = [], $s
                     'from_time' => $reservation->reservation->from_time,
                     'end_time' => $reservation->reservation->end_time,
                 ]);
-                $redis = \LRedis::connection();
-                $redis->publish('reservation_booking', json_encode([
-                    'store_id' => $store_id,
-                    'channel' => 'booking_table_change',
-                    'notification_id' => 0,
-                    'additional_data' => $additionalData,
-                    'system_name' => 'Reservation'
-                ]));
+//                $redis = \LRedis::connection();
+//                $redis->publish('reservation_booking', json_encode([
+//                    'store_id' => $store_id,
+//                    'channel' => 'booking_table_change',
+//                    'notification_id' => 0,
+//                    'additional_data' => $additionalData,
+//                    'system_name' => 'Reservation'
+//                ]));
             } else {
-                $redis = \LRedis::connection();
-                $redis->publish('reservation_booking', json_encode([
-                    'store_id'        => $store_id,
-                    'channel' => $channel?$channel:'new_booking',
-                    'notification_id' => 0,
-                    'additional_data' => $additionalData,
-                    'system_name' => 'Reservation'
-                ]));
+//                $redis = \LRedis::connection();
+//                $redis->publish('reservation_booking', json_encode([
+//                    'store_id'        => $store_id,
+//                    'channel' => $channel?$channel:'new_booking',
+//                    'notification_id' => 0,
+//                    'additional_data' => $additionalData,
+//                    'system_name' => 'Reservation'
+//                ]));
             }
 
             Log::info('new booking web notification success:');
         }
         return true;
-    }
-    catch (\Exception $e) {
-        Log::info('New booking web notification error: ' . $e->getMessage().$e->getLine().$e->getFile(). ', IP address : '.request()->ip(). ', browser : '. request()->header('User-Agent'));
+    } catch (\Exception $e) {
+        Log::info('New booking web notification error: ' . $e->getMessage() . $e->getLine() . $e->getFile() . ', IP address : ' . request()->ip() . ', browser : ' . request()->header('User-Agent'));
     }
 }

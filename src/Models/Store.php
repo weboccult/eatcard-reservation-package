@@ -2,12 +2,9 @@
 
 namespace Weboccult\EatcardReservation\Models;
 
-use Weboccult\EatcardReservation\ImageFilters;
-use  Weboccult\EatcardReservation\Models\StoreSetting;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\Log;
 
 class Store extends Model
 {
@@ -133,20 +130,11 @@ class Store extends Model
         /*'total_cards_count', 'total_activated_cards_count', 'email_page_logo'*/
     ];
 
-//    protected $dates = [ 'deleted_at' ];
+    public function user()
+    {
+        return $this->hasOne(User::class);
+    }
 
-//    public function getEmailPageLogoAttribute()
-//    {
-//        if ($this->page_logo) {
-//            return ImageFilters::applyFilter('EmailStoreLogo', $this->page_logo);
-//        }
-//    }
-//
-//    public function user()
-//    {
-//        return $this->hasOne('App\Models\User');
-//    }
-//
     public function storeSetting()
     {
         return $this->hasOne(StoreSetting::class, 'store_id', 'id');
@@ -156,22 +144,12 @@ class Store extends Model
     {
         return $this->hasOne(StoreButler::class, 'store_id', 'id');
     }
-//
+
     public function multiSafe()
     {
         return $this->hasOne(MultiSafePay::class, 'store_id', 'id');
     }
-//
-//    public function getTotalCardsCountAttribute()
-//    {
-//        return Card::where('store_id', $this->id)->count();
-//    }
-//
-//    public function getTotalActivatedCardsCountAttribute()
-//    {
-//        return Card::where('store_id', $this->id)->where('status', 'active')->count();
-//    }
-//
+
     public function getReservationOffDates($store)
     {
         if ($store->reservation_off != 0) {

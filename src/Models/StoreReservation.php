@@ -3,7 +3,6 @@
 namespace Weboccult\EatcardReservation\Models;
 
 use App\Services\PushNotification\OneSignal\Facades\OneSignalService;
-use Weboccult\EatcardReservation\Models\User;
 use Cmgmyr\Messenger\Models\Message;
 use Cmgmyr\Messenger\Models\Thread;
 use Illuminate\Database\Eloquent\Model;
@@ -59,9 +58,12 @@ class StoreReservation extends Model
         'local_payment_status',
         'reservation_type',
         'total_price',
+        'coupon_price',
+        'gift_purchase_id',
         'original_total_price',
         'section_id',
         'is_refunded',
+        'gift_card_code',
         'refund_price',
         'refund_price_date',
         'is_dine_in',
@@ -118,21 +120,6 @@ class StoreReservation extends Model
 	{
 		return $this->getRawOriginal('res_date');
 	}
-    public function getResDutchDateAttribute()
-    {
-        return getDutchDateTable($this->res_date);
-    }
-
-
-    public function getResDateAttribute($value)
-    {
-        return getDutchDate($value);
-    }
-    public function getDutchDateAttribute($value)
-    {
-        return getDutchDateTable($this->created_at);
-    }
-
 
     public function scopeSearch($query, $search)
     {
@@ -177,87 +164,6 @@ class StoreReservation extends Model
         return $this->hasMany(ReservationTable::class, 'reservation_id');
     }
 
-    public function store_belongs_to($store_id)
-    {
-        $owners = StoreOwner::where('store_id', $store_id)->pluck('user_id')->toArray();
-        $managers = StoreManager::where('store_id', $store_id)->pluck('user_id')->toArray();
-        $userId = array_merge($owners, $managers);
-        return $userId;
-    }
-
-    public function reservationStatusNotification($notificationData)
-    {
-
-        $additional_data = json_decode($notificationData['additional_data']);
-        try {
-
-            if (isset($additional_data) && isset($additional_data->reservation_id)) {
-                $currentOrder = StoreReservation::findorFail($additional_data->reservation_id);
-                $currentOrdersUser = $currentOrder->store_belongs_to($currentOrder->store_id);
-
-                if (!$currentOrdersUser) {
-                    return ['status' => 'failed', 'message' => 'Reservation not attached with any user yet.!'];
-                }
-
-                $userIds = $currentOrdersUser;
-
-                $additional_data = [
-                    'data' => json_decode($notificationData['additional_data'], true),
-                ];
-
-                $newNotification = GeneralNotification::create([
-                    'type' => $notificationData['type'],
-                    'notification' => $notificationData['description'],
-                    'additional_data' => json_encode($additional_data),
-                ]);
-
-                $one_signal_user_devices_oids = [];
-                if ($newNotification) {
-                    $newNotification->users()->attach($userIds);
-                    $is_send_push = false;
-                    $devices = Device::whereIn('user_id', $userIds)->get();
-                    if (count($devices) > 0) {
-                        $one_signal_user_devices_oids = $devices->pluck('onesignal_id')->toArray();
-                    }
-                }
-
-//                if (count($one_signal_user_devices_oids) > 0) {
-                    $push_notification_data = [
-                        'title' => 'Eatcard',
-                        'text' => $notificationData['description'],
-                        'type' => $notificationData['type'],
-                        'description_title' => (isset($notificationData['description_title']) &&
-                            !empty($notificationData['description_title'])) ? $notificationData['description_title'] : "",
-                        'additional_data' => $notificationData['additional_data'],
-                        'player_ids' => $one_signal_user_devices_oids,
-                        'store_id' => $currentOrder->store_id
-                    ];
-
-                    try {
-                        $is_send_push = OneSignalService::sendPushNotficaition($push_notification_data);
-                        if ($is_send_push) {
-	                        $newNotification->users()->detach($userIds);
-	                        $newNotification->delete();
-                        }
-                    } catch (\Exception $exception) {
-                        return ['status' => 'failed', 'message' => json_encode($exception)];
-
-	                }
-
-                if ($is_send_push) {
-                    return ['status' => 'success', 'message' => 'New notification created and send to all user.!'];
-                } else {
-                    return ['status' => 'success', 'message' => 'New notification created. but failed to send.'];
-                }
-
-            } else {
-                return ['status' => 'failed', 'message' => 'Reservation not found.!'];
-            }
-        } catch (\Exception $e) {
-            return ['status' => 'failed', 'message' => 'Reservation not found.!'];
-        }
-    }
-
     public function thread()
     {
         $data = $this->hasManyThrough(Message::class, Thread::class, 'id', 'id', 'thread_id', 'id')->with(['participants' => function($q) {
@@ -277,12 +183,6 @@ class StoreReservation extends Model
 //        }
 //        return $data;
     }
-
-    public function isShow()
-    {
-        $this->update(['is_show' => 1]);
-    }
-
     public function messages()
     {
         return $this->hasMany(Message::class, 'thread_id', 'thread_id');

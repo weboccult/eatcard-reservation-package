@@ -3,7 +3,6 @@
 namespace Weboccult\EatcardReservation\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Log;
 
 class StoreWeekDay extends Model
 {

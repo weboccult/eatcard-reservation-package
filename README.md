@@ -16,10 +16,43 @@ composer require weboccult/eatcard-reservation
 
 ## Usage
 
+#### Disable Date List & First Day
 ```php
-// Usage description here
-```
+EatcardReservation::slug('store slug')
+->data('request data')
+->getSlotsMonthly();
 
+Request Data :
+    ['month' => MM,'year' => YYYY]
+```
+#### Fetch all available slots, current time and Booking end time 
+```php
+EatcardReservation::data('request data')
+->slots();
+
+Request Data :
+    ['date' =>  YYYY-MM-DD,
+    'Unique slug' => abcd, etc.]
+```
+#### Get active all meals & messages
+```php
+EatcardReservation::data('request data')
+->getMeals();
+
+Request Data :
+    ['Unique id' => 00,
+    'date' => YYYY-MM-DD,
+    'Unique time' => 00:00, etc.]
+```
+#### Create new Reservation
+```php
+EatcardReservation::data('request data')
+->reservationData();
+
+Request Data :
+    ['New Reservation Data']
+    
+```
 ### Testing
 
 ```bash

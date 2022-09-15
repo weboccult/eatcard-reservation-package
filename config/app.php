@@ -12,6 +12,14 @@ return [
       |
       */
 
-    'timezone' => 'Europe/Amsterdam'
+    'timezone' => 'Europe/Amsterdam',
+
+    'providers' => [
+        Illuminate\Redis\RedisServiceProvider::class,
+    ],
+
+    'aliases' => [
+        'LRedis' => Illuminate\Support\Facades\Redis::class,
+    ],
 
 ];

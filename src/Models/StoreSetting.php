@@ -2,9 +2,7 @@
 
 namespace  Weboccult\EatcardReservation\Models;
 
-use  Weboccult\EatcardReservation\Models\Store;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Log;
 
 class StoreSetting extends Model
 {
@@ -42,9 +40,4 @@ class StoreSetting extends Model
 	{
 		return $this->hasOne(Store::class, 'id', 'store_id');
 	}
-
-	public function getUserAdditionalFeeAttribute()
-	{
-        return number_format((float)$this->additional_fee, 2, ',', '');
-    }
 }

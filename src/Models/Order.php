@@ -114,33 +114,6 @@ class Order extends Model
 	{
 		return $this->first_name. ' '. $this->last_name;
 	}
-	public function orderItems()
-	{
-		return $this->hasMany(OrderItem::class, 'order_id');
-	}
-
-	public function subOrders()
-    {
-        return $this->hasMany(SubOrder::class, 'parent_order_id');
-    }
-
-    public function driver()
-    {
-        return $this->belongsToMany(Driver::class, 'order_delivery_trips', 'order_id', 'driver_id')->where('order_status', 'Confirmed')->orderBy('order_delivery_trips.created_at', 'desc');
-    }
-    public function order_delivery_detail()
-    {
-        return $this->hasOne(OrderDeliveryDetails::class, 'order_id');
-    }
-
-    public function pickedup()
-    {
-        return $this->hasMany(OrderDeliveryTrip::class, 'order_id')->where('order_status', 'Picked Up');
-    }
-
-	public function kiosk(){
-        return $this->belongsTo(KioskDevice::class,'kiosk_id','id');
-    }
 	public function reservation(){
         return $this->belongsTo(StoreReservation::class,'parent_id');
     }

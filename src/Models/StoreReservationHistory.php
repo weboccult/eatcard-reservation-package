@@ -2,7 +2,6 @@
 
 namespace Weboccult\EatcardReservation\Models;
 
-use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 

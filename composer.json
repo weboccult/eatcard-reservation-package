@@ -17,12 +17,14 @@
     ],
     "require": {
         "php": "^7.4|^8.0",
-        "ext-json": "*",
-        "illuminate/support": "^8.0 || ^9.0",
-        "laravel/breeze": "*",
-        "swiftmailer/swiftmailer": "^6.3",
-        "mollie/laravel-mollie": "^2.13",
         "guzzlehttp/guzzle": "^7.0.1",
+        "illuminate/support": "^8.0 || ^9.0",
+        "cmgmyr/messenger": "^2.21",
+        "laravel/breeze": "*",
+        "mollie/laravel-mollie": "^2.13",
+        "simplesoftwareio/simple-qrcode": "~4",
+        "predis/predis": "^2.0",
+        "swiftmailer/swiftmailer": "^6.3",
         "symfony/mailer": "^6.1"
     },
     "require-dev": {

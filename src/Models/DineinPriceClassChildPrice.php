@@ -19,9 +19,4 @@ class DineinPriceClassChildPrice extends Model
     ];
 
     protected $appends = ['person'];
-
-    public function getPersonAttribute()
-    {
-        return 0;
-    }
 }
