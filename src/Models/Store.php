@@ -150,7 +150,12 @@ class Store extends Model
         return $this->hasOne(MultiSafePay::class, 'store_id', 'id');
     }
 
-    public function getReservationOffDates($store)
+	/**
+	 * @param $store : Object
+	 * @return array
+	 * @Description Get store off dates
+	 */
+	public function getReservationOffDates($store)
     {
         if ($store->reservation_off != 0) {
 

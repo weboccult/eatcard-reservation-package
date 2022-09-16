@@ -29,7 +29,7 @@ use function Weboccult\EatcardReservation\Helper\tableAssign;
 use function Weboccult\EatcardReservation\Helper\getDisable;
 use function Weboccult\EatcardReservation\Helper\getNextEnableDates;
 use function Weboccult\EatcardReservation\Helper\getStoreBySlug;
-use function Weboccult\EatcardReservation\Helper\modifiedSlots;
+use function Weboccult\EatcardReservation\Helper\modifiedSlotsDates;
 use function Weboccult\EatcardReservation\Helper\SpecificDateSlots;
 use function Weboccult\EatcardReservation\Helper\specificDaySlots;
 use function Weboccult\EatcardReservation\Helper\generalSlots;
@@ -39,7 +39,7 @@ use function Weboccult\EatcardReservation\Helper\weekOffDay;
 
 class EatcardReservation
 {
-    /**
+    /**TODO Remove this function
      * @param $name
      *
      * @return mixed
@@ -96,37 +96,29 @@ class EatcardReservation
         return $this;
     }
 
-    /**
-     * @param $slug : String
-     * @param $data : Array
-     * @return array
-     * @Description get given store slug slots based on given data
-     */
-    public function getSlotsMonthly()
+	/**
+	 * @return array
+	 * @Description get given store slug slots based on given data
+	 */
+	public function getSlotsMonthly()
     {
-
         $this->store = getStoreBySlug($this->slug);
-
-        //Find current month
+        //Find current month & year
         $current_month = Carbon::now()->format('m');
         $current_year = Carbon::now()->format('Y');
         //Find Get month by User
-        $get_month = $this->data['month'];
-        $get_year = $this->data['year'];
+        $selected_month = $this->data['month'];
+        $selected_year = $this->data['year'];
         $get_data = [];
 
         //User select month
-        if ($get_month == null && $get_year == null) {
-            $current_month_str = $current_month;
-            $current_year_str = $current_year;
-        } else {
-            $current_month_str = $get_month;
-            $current_year_str = $get_year;
+        if ($selected_month == null && $selected_year == null) {
+            $selected_month = $current_month;
+            $selected_year = $current_year;
         }
 
         //Given dates using months and years
-        $yearAndDate = Carbon::create($current_year_str)->month($current_month_str);
-
+        $yearAndDate = Carbon::create($selected_year)->month($selected_month);
         $monthStart = $yearAndDate->startOfMonth()->format('Y-m-d');
         $monthEnd = $yearAndDate->endOfMonth()->format('Y-m-d');
         $ranges = CarbonPeriod::create($monthStart, $monthEnd);
@@ -135,38 +127,34 @@ class EatcardReservation
         foreach ($ranges as $date) {
             $dates[] = $date->format('Y-m-d');
         }
+		/*Find selected month disable dates*/
+        $currentMonthDisabledDates = currentMonthDisabledDatesList($this->store, $selected_month);
 
-        $currentMonthDisabledDates = currentMonthDisabledDatesList($this->store, $current_month_str);
+        /*Find admin disable day*/
+        $disableDayByAdmin = disableDayByAdmin($this->store, $selected_month);
 
-        $disableDayByAdmin = disableDayByAdmin($this->store, $current_month_str);
+        /*Find given month off days and dates*/
+        $weekOff = weekOffDay($this->store, $selected_month, $selected_year);
+		$weekOffDates = $weekOff['weekOffDates'];
+	    $weekOffDays = $weekOff['weekOffDays'];
 
-        $weekOffDay = weekOffDay($this->store, $current_month_str, $current_year_str);
-
-        $modifiedSlots = modifiedSlots($this->store, $current_month_str);
-
-        //First Day Of month Activate
-        $modified_days = StoreWeekDay::query()
-            ->where('store_id', $this->store->id)
-            ->where('is_week_day_meal', 0)
-            ->whereNull('is_active')
-            ->get()
-            ->pluck('name')
-            ->toArray();
+        /*Get modified slots date*/
+        $modifiedSlotsDates = modifiedSlotsDates($this->store, $selected_month);
 
         $firstDay = '';
-        if ($current_month_str == Carbon::now()->format('m')) {
-            $firstDay = getNextEnableDates($weekOffDay, Carbon::now()->format('Y-m-d'), $modified_days);
-            $bookingOffData = $this->checkBookingOffFirstDay($firstDay, $weekOffDay, $this->store);
+        if ($selected_month == Carbon::now()->format('m')) {
+            $firstDay = getNextEnableDates($weekOffDates, Carbon::now()->format('Y-m-d'), $weekOffDays);
+            $bookingOffData = $this->checkBookingOffFirstDay($firstDay, $weekOffDates, $this->store);
             $firstDay = $bookingOffData['firstDayOfMonth'];
         }
 
-        $two_arr_day_week = array_merge($disableDayByAdmin, $weekOffDay);
-        $unique = array_merge($two_arr_day_week, $modifiedSlots);
+        $two_arr_day_week = array_merge($disableDayByAdmin, $weekOffDates);
+        $unique = array_merge($two_arr_day_week, $modifiedSlotsDates);
 
         $result = array_merge($currentMonthDisabledDates, array_unique($unique));
         $result = array_unique($result);
 
-        $get_data['month'] = $current_month_str;
+        $get_data['month'] = $selected_month;
         $get_data['First_day_of_month'] = $firstDay;
         $get_data['all_disable_dates'] = array_values($result);
         return $get_data;
@@ -183,25 +171,13 @@ class EatcardReservation
      */
     public function slots($store_slug = null,$slot_time = null, $slot_model = null)
     {
-        if(isset($store_slug['store_slug'])){
-            $this->store = getStoreBySlug($store_slug['store_slug']);
-        }else{
-            $this->store = getStoreBySlug($this->data['store_slug']);
-        }
-
-        if(isset($this->data['res_date'])){
-            $specific_date = $this->data['res_date'];
-        }else{
-            $specific_date = $this->data['date'];
-        }
+	    $this->store = getStoreBySlug($this->data['store_slug'] ?? $store_slug);
+        $specific_date = $this->data['res_date'] ?? $this->data['date'];
         $section_id = $this->data['section_id'];
 
         $disableByDay = [];
-
         if (Carbon::parse($specific_date)->format('m') == Carbon::now()->format('m')) {
             $disableByDay = $this->store->getReservationOffDates($this->store);
-        } else {
-            $disableByDay = [];
         }
 
         //Specific Date Wise Slots
@@ -327,7 +303,7 @@ class EatcardReservation
 
         $store_slug = Store::query()
             ->where('id', $store_id)
-            ->get('store_slug')
+            ->pluck('store_slug')
             ->first();
 //        $this->data[1]['store_slug'] = $store_slug;
 

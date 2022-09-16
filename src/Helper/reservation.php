@@ -568,80 +568,48 @@ if (!function_exists('createNewReservation')) {
 if (!function_exists('currentMonthDisabledDatesList')) {
     /**
      * @param $store
-     * @param $current_month_str
+     * @param $selected_month
      * @return array
-     * @description Fetch the current month disable date list array
+     * @description Fetch the selected month disable date list from storeSlotModified table
      */
-    function currentMonthDisabledDatesList($store, $current_month_str)
+    function currentMonthDisabledDatesList($store, $selected_month)
     {
-
-        //disable date list for manually disabled admin
-        $currentDateAvailability = StoreSlotModified::query()
+	    $getDates = StoreSlotModified::query()
             ->where('store_id', $store->id)
             ->where('is_day_meal', 0)
             ->where('is_available', 0)
-            ->whereRaw('MONTH(store_date) = ?', $current_month_str)
-            ->get();
-        $getDates = $currentDateAvailability->pluck('store_date')->toArray();
+            ->whereRaw('MONTH(store_date) = ?', $selected_month)
+	        ->pluck('store_date')->toArray();
 
-        $currentMonthDisabledDates = [];
+	    $finalDisableDates = [];
+	    foreach ($getDates as $disabledDate) {
+		    if(!in_array($disabledDate, $finalDisableDates)) {
+			    $finalDisableDates[] = $disabledDate;
+		    }
+	    }
 
-        if ($current_month_str == Carbon::now()->format('m')) {
-            if (count($getDates) > 0) {
-                foreach ($getDates as $getDate) {
-                    $date = Carbon::createFromFormat('Y-m-d', $getDate);
-                    $date = $date->format('m');
-                    if ($date == Carbon::now()->format('m')) {
-                        $currentMonthDisabledDates[] = Carbon::parse($getDate)->format('Y-m-d');
-                    }
-                }
-            }
-        } elseif ($current_month_str != Carbon::now()->format('m') && $current_month_str != '') {
-
-            if (isset($current_month_str) && $current_month_str != "") {
-                //Specific slots modified in admin
-                $manualMonthGetDates = StoreSlotModified::query()
-                    ->where('store_id', $store->id)
-                    ->where('is_available', 0)
-                    ->where('is_day_meal', 0)
-                    ->whereRaw('MONTH(store_date) = ?', $current_month_str)
-                    ->pluck('store_date');
-            }
-            if (isset($manualMonthGetDates) && count($manualMonthGetDates) > 0) {
-                foreach ($manualMonthGetDates as $getDate) {
-                    $currentMonthDisabledDates[] = $getDate;
-                }
-            }
-        }
-
-        $currentMonthDisabledDates = array_unique($currentMonthDisabledDates);
-        $currentMonthDisabledDates = array_values($currentMonthDisabledDates);
-
-        Log::info("Disable date list for manually disabled admin : ", $currentMonthDisabledDates);
-        return $currentMonthDisabledDates;
-
+        Log::info("Disable date list for manually disabled admin : ", $finalDisableDates);
+        return $finalDisableDates;
     }
 }
 
 if (!function_exists('disableDayByAdmin')) {
     /**
      * @param $store
-     * @param $current_month_str
+     * @param $selected_month
      * @return array
      * @description Disable day from admin setting
      */
-    function disableDayByAdmin($store, $current_month_str)
+    function disableDayByAdmin($store, $selected_month)
     {
-
         //Disable Days and today's day disable from admin
         $disableByDayAdmin = [];
-
-        if ($current_month_str && $current_month_str == Carbon::now()->format('m')) {
+        if ($selected_month && $selected_month == Carbon::now()->format('m')) {
             $disableByDayAdmin = $store->getReservationOffDates($store);
-        } elseif ($current_month_str != Carbon::now()->format('m')) {
+        } elseif ($selected_month != Carbon::now()->format('m')) {
         }
 
-        if (isset($store->reservation_off_chkbx) && Carbon::now()->format('m') == $current_month_str && $store->reservation_off_chkbx == 1) {
+        if (isset($store->reservation_off_chkbx) && Carbon::now()->format('m') == $selected_month && $store->reservation_off_chkbx == 1) {
             $disableByDayAdmin[] = Carbon::now()->format('Y-m-d');
         }
         Log::info("Disable Days and today's day disable from admin : ", $disableByDayAdmin);
@@ -652,68 +620,62 @@ if (!function_exists('disableDayByAdmin')) {
 if (!function_exists('weekOffDay')) {
     /**
      * @param $store
-     * @param $current_month_str
-     * @param $current_year_str
+     * @param $selected_month
+     * @param $selected_year
      * @return array
      * @description check the every weekly off day
      */
-    function weekOffDay($store, $current_month_str, $current_year_str)
+    function weekOffDay($store, $selected_month, $selected_year)
     {
-
         // disable days on week off day's
-        $weekOffDay = [];
-
-        $modified_days = StoreWeekDay::query()
+        $weekOffDates = [];
+	    $weekOffDay = StoreWeekDay::query()
             ->where('store_id', $store->id)
             ->where('is_week_day_meal', 0)
             ->whereNull('is_active')
-            ->get()
             ->pluck('name')
             ->toArray();
         $lastDayMonth = Carbon::now()->endOfMonth()->format('d');
 
-
-        if (count($modified_days)) {
+        if (count($weekOffDay)) {
             for ($i = 1; $i <= $lastDayMonth; $i++) {
-                $date = $current_year_str . '-' . $current_month_str . '-' . $i;
-                if (in_array(Carbon::parse($date)->format('l'), $modified_days)) {
-                    $weekOffDays = Carbon::parse($date)->format('Y-m-d');
-                    if (Carbon::createFromFormat('Y-m-d', $weekOffDays)->month == $current_month_str) {
-                        $weekOffDay[] = $weekOffDays;
+                $date = $selected_year . '-' . $selected_month . '-' . $i;
+                if (in_array(Carbon::parse($date)->format('l'), $weekOffDay)) {
+                    if (Carbon::createFromFormat('Y-m-d', $date)->month == $selected_month) {
+	                    $weekOffDates[] = $date;
                     }
                 }
             }
         }
+        Log::info("Disable days on week off date's : ", $weekOffDates);
         Log::info("Disable days on week off day's : ", $weekOffDay);
-        return $weekOffDay;
+        return [
+        	'weekOffDays' => $weekOffDay,
+	        'weekOffDates' => $weekOffDates
+        ];
     }
 }
 
-if (!function_exists('modifiedSlots')) {
+if (!function_exists('modifiedSlotsDates')) {
     /**
      * @param $store
-     * @param $current_month_str
+     * @param $selected_month
      * @return array
-     * @description Fetch only Modified slots
+     * @description Fetch only Modified slots date
      */
-    function modifiedSlots($store, $current_month_str)
+    function modifiedSlotsDates($store, $selected_month)
     {
         //Slot modified available on date or day
-        $modified_slots = StoreSlotModified::query()
+        $modified_slots_date = StoreSlotModified::query()
             ->where('store_id', $store->id)
-            ->whereRaw('MONTH(store_date) = ?', $current_month_str)
+            ->whereRaw('MONTH(store_date) = ?', $selected_month)
             ->where('is_day_meal', 0)
             ->where('is_available', 1)
             ->orderBy('store_date', 'desc')
-            ->get()
             ->pluck('store_date')
             ->toArray();
-
-        foreach ($modified_slots as $key => $slot) {
-            $modified_slots[$key] = Carbon::parse($slot)->format('Y-m-d');
-        }
-        Log::info("Modified Slots Date : ", $modified_slots);
-        return $modified_slots;
+        Log::info("Modified Slots Date : ", $modified_slots_date);
+        return $modified_slots_date;
     }
 }
 
