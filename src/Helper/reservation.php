@@ -517,8 +517,8 @@ if (!function_exists('createNewReservation')) {
                             ],
                             'method' => $data['method'],
                             "description" => "Order #" . $storeNewReservation->reservation_id,
-                            "redirectUrl" => route('booking.orders-success', ['id' => $storeNewReservation->id, 'store_id' => $store->id, 'url' => $data['url']]),
-                            "webhookUrl" => route('booking.webhook', ['id' => $storeNewReservation->id, 'store_id' => $store->id]),
+                            "redirectUrl" => route('booking.orders-success', ['id' => $storeNewReservation->id, 'store_id' => $store->id, 'url' => $data['url'], 'language' => $data['language']]),
+                            "webhookUrl" => route('booking.webhook', ['id' => $storeNewReservation->id, 'store_id' => $store->id, 'language' => $data['language']]),
                             "metadata" => [
                                 "order_id" => $storeNewReservation->reservation_id,
                             ],
@@ -539,9 +539,9 @@ if (!function_exists('createNewReservation')) {
                             'payment_options' => [
                                 'notification_url' => route('booking.webhook.multisafe', ['id' => $storeNewReservation->id, 'store_id' => $store->id]),
 //                                        'notification_url' => 'http://f297e99b22ff.ngrok.io/multisafe/booking-webhook/'+$storeRes->id+'/'+$store->id,
-                                'redirect_url' => route('booking.orders-success.multisafe', ['id' => $storeNewReservation->id, 'store_id' => $store->id, 'url' => $data['url']]),
+                                'redirect_url' => route('booking.orders-success.multisafe', ['id' => $storeNewReservation->id, 'store_id' => $store->id, 'url' => $data['url'], 'language' => $data['language']]),
 //                                    'redirect_url' => ' http://f297e99b22ff.ngrok.io/multisafe/booking-success/'+$storeRes->id+'/'+$store->id,
-                                'cancel_url' => route('booking.cancel.multisafe', ['id' => $storeNewReservation->id, 'store_id' => $store->id, 'url' => $data['url']]),
+                                'cancel_url' => route('booking.cancel.multisafe', ['id' => $storeNewReservation->id, 'store_id' => $store->id, 'url' => $data['url'], 'language' => $data['language']]),
 //                                    'cancel_url' => ' http://f297e99b22ff.ngrok.io/multisafe/booking-cancel/'+$storeRes->id+'/'+$store->id,
                                 'close_window' => true,
                             ]
