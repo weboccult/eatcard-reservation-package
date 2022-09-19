@@ -333,7 +333,7 @@ class EatcardReservation
         $disable = '';
         $class = '';
 
-        $store = getStoreBySlug($store_slug->store_slug);
+        $store = getStoreBySlug($store_slug);
 
         // Booking time off for current day checking
         if ($store->is_booking_enable == 1 && $specific_date === Carbon::now()->format('Y-m-d')) {
