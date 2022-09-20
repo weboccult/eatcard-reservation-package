@@ -447,7 +447,7 @@ class EatcardReservation
         }
 
         //fetch the slot details
-        $slot = dataModelSlots($this->data['data_model'], $this->data['from_time'], $this->data['meal_type']);
+        $slot = dataModelSlots($this->data['data_model'], $this->data['slot_id'], $this->data['meal_type']);
         if (isset($slot['error'])) {
             Log::info("dataModelSlots function get error message");
             return $slot;
@@ -620,6 +620,12 @@ class EatcardReservation
                 }
             }
         }
+
+	    if($meal->price == null || $meal->price == 0 || $meal->payment_type == 2){
+		    $this->data['payment_method_type'] = '';
+		    $this->data['method'] = '';
+	    }
+	    Log::info("Meal price null or 0 " . $this->data['payment_method_type'] . $this->data['method'] );
 
         if (!($meal->payment_type == 1 || $meal->payment_type == 3) && !$meal->price) {
             $this->data['payment_method_type'] = '';
