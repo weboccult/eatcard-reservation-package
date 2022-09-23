@@ -246,7 +246,7 @@ if (!function_exists('dataModelSlots')) {
     {
         //Check store slot and week day wise active or not
         if ($data_model == 'StoreSlot') {
-	        Log:info("Store slot slots");
+	        Log::info("Store slot slots");
             $slot = StoreSlot::query()
                 ->where('from_time', $from_time)
                 ->where('meal_id', $meal_id)
@@ -264,7 +264,7 @@ if (!function_exists('dataModelSlots')) {
                 }
             }
         } else {
-        	Log:info("Store slot modified slots");
+        	Log::info("Store slot modified slots");
             $slot = StoreSlotModified::query()
                 ->where('from_time', $from_time)
                 ->where('meal_id', $meal_id)
