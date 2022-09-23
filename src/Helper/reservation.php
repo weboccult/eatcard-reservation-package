@@ -376,18 +376,18 @@ if (!function_exists('createNewReservation')) {
                     ->get()
                     ->first();
             }
-            $time_difference = 0;
-            if (isset($first_reservation->created_at)) {
-                $current_time = Carbon::now();
-                $end_time = Carbon::parse($first_reservation->created_at);
-                $time_difference = $current_time->diffInSeconds($end_time);
-            }
-            if ($time_difference > 90) {
-                $check_time = $this->reservation_job
-                    ->whereNotNull('id')
-                    ->update(['is_failed' => 1, 'attempt' => 2]);
-                $normal_functionality = true;
-            }
+//            $time_difference = 0;
+//            if (isset($first_reservation->created_at)) {
+//                $current_time = Carbon::now();
+//                $end_time = Carbon::parse($first_reservation->created_at);
+//                $time_difference = $current_time->diffInSeconds($end_time);
+//            }
+//            if ($time_difference > 90) {
+//                $check_time = $this->reservation_job
+//                    ->whereNotNull('id')
+//                    ->update(['is_failed' => 1, 'attempt' => 2]);
+//                $normal_functionality = true;
+//            }
             //Create entry in reservation job table
             $reservation_job = ReservationJob::query()->create($reservation_data);
             StoreReservation::query()->where('id', $storeNewReservation->id)->update(['gift_card_code' => $data['qr_code']]);
@@ -524,6 +524,7 @@ if (!function_exists('createNewReservation')) {
                                 "order_id" => $storeNewReservation->reservation_id,
                             ],
                         ]);
+                        Log::info('Mollie payment gateaway payload : '. json_encode($payment).' | Mollie key : ' .$store->mollie_api_key);
                         $storeNewReservation->update(['mollie_payment_id' => $payment->id,/*, 'payment_status'    => 'pending'*/]);
                         return ['status' => 'success', 'payment' => true, 'data' => $payment->_links->checkout->href, 'code' => 200];
                     } else {
