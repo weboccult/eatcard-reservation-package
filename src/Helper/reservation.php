@@ -511,20 +511,21 @@ if (!function_exists('createNewReservation')) {
                 try {
                     if ($data['payment_method_type'] == 'mollie') {
                         Mollie::api()->setApiKey($store->mollie_api_key);
-                        $payment = Mollie::api()->payments()->create([
-                            "amount" => [
-                                "currency" => "EUR",
-                                "value" => '' . number_format($storeNewReservation->total_price, 2, '.', '')
-                            ],
-                            'method' => $data['method'],
-                            "description" => "Order #" . $storeNewReservation->reservation_id,
-                            "redirectUrl" => route('booking.orders-success', ['id' => $storeNewReservation->id, 'store_id' => $store->id, 'url' => $data['url'], 'language' => $data['language']]),
-                            "webhookUrl" => route('booking.webhook', ['id' => $storeNewReservation->id, 'store_id' => $store->id, 'language' => $data['language']]),
-                            "metadata" => [
-                                "order_id" => $storeNewReservation->reservation_id,
-                            ],
-                        ]);
-                        Log::info('Mollie payment gateaway payload : '. json_encode($payment).' | Mollie key : ' .$store->mollie_api_key);
+                        $paymentPayloadData = [
+	                        "amount" => [
+		                        "currency" => "EUR",
+		                        "value" => '' . number_format($storeNewReservation->total_price, 2, '.', '')
+	                        ],
+	                        'method' => $data['method'],
+	                        "description" => "Order #" . $storeNewReservation->reservation_id,
+	                        "redirectUrl" => route('booking.orders-success', ['id' => $storeNewReservation->id, 'store_id' => $store->id, 'url' => $data['url'], 'language' => $data['language']]),
+	                        "webhookUrl" => route('booking.webhook', ['id' => $storeNewReservation->id, 'store_id' => $store->id, 'language' => $data['language']]),
+	                        "metadata" => [
+		                        "order_id" => $storeNewReservation->reservation_id,
+	                        ],
+                        ];
+	                    Log::info('Mollie payment gateaway payload : '. json_encode($paymentPayloadData).' | Mollie key : ' .$store->mollie_api_key);
+	                    $payment = Mollie::api()->payments()->create($paymentPayloadData);
                         $storeNewReservation->update(['mollie_payment_id' => $payment->id,/*, 'payment_status'    => 'pending'*/]);
                         return ['status' => 'success', 'payment' => true, 'data' => $payment->_links->checkout->href, 'code' => 200];
                     } else {
