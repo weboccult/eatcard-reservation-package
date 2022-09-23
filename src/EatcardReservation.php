@@ -447,14 +447,14 @@ class EatcardReservation
         }
 
         //fetch the slot details
-        $slot = dataModelSlots($this->data['data_model'], $this->data['slot_id'], $this->data['meal_type']);
+        $slot = dataModelSlots($this->data['data_model'], $this->data['from_time'], $this->data['meal_type']);
         if (isset($slot['error'])) {
             Log::info("dataModelSlots function get error message");
             return $slot;
         }
 
         //Check in slot verify the from time
-        if (!isset($slot->from_time)) {
+        if (!isset($slot['from_time'])) {
             Log::info('slot not founded : ' . json_encode($slot, JSON_PRETTY_PRINT));
             return [
                 'code' => '400',
@@ -465,7 +465,7 @@ class EatcardReservation
 
         // Make past date and time always disabled then return error message
         $current24Time = Carbon::now()->format('H:i');
-        if (isset($store) && ($this->data['res_date'] < Carbon::now()->format('Y-m-d') || ($this->data['res_date'] == Carbon::now()->format('Y-m-d') && strtotime($slot->from_time) <= strtotime($current24Time)))) {
+        if (isset($store) && ($this->data['res_date'] < Carbon::now()->format('Y-m-d') || ($this->data['res_date'] == Carbon::now()->format('Y-m-d') && strtotime($slot['from_time']) <= strtotime($current24Time)))) {
             Log::info("Make past date and time always disabled");
             return [
                 'code' => '400',
@@ -508,10 +508,10 @@ class EatcardReservation
             ->where('meal_type', $this->data['meal_type'])
             ->count();
 
-        if ($slot->max_entries != 'Unlimited' && $count >= $slot->max_entries && !$is_owner) {
+        if ($slot['max_entries'] != 'Unlimited' && $count >= $slot['max_entries'] && !$is_owner) {
             $is_valid_reservation = false;
         }
-        if ($slot->is_slot_disabled && $this->data['res_date'] == Carbon::now()->format('Y-m-d')) {
+        if ($slot['is_slot_disabled'] && $this->data['res_date'] == Carbon::now()->format('Y-m-d')) {
             $is_valid_reservation = false;
         }
 
@@ -526,11 +526,11 @@ class EatcardReservation
         }
 
         //Remain person number
-        $remainPersons = (int)$slot->max_entries - (int)$assignPersons;
-        if ($slot->max_entries != 'Unlimited' && $this->data['person'] > $remainPersons && !$is_owner) {
+        $remainPersons = (int)$slot['max_entries'] - (int)$assignPersons;
+        if ($slot['max_entries'] != 'Unlimited' && $this->data['person'] > $remainPersons && !$is_owner) {
             $is_valid_reservation = false;
         }
-        if ($slot->max_entries != 'Unlimited' && $this->data['person'] > $slot->max_entries && !$is_owner) {
+        if ($slot['max_entries'] != 'Unlimited' && $this->data['person'] > $slot['max_entries'] && !$is_owner) {
             $is_valid_reservation = false;
         }
         if ($is_valid_reservation == false) {
@@ -544,19 +544,18 @@ class EatcardReservation
 
         //Fetch the data from user's details and other parameters
         $this->data['store_id'] = $store->id;
-        $this->data['slot_id'] = $slot->id;
-        $this->data['from_time'] = Carbon::parse($slot->from_time)->format('H:i');
-        $this->data['res_time'] = Carbon::parse($slot->from_time)->format('H:i');
-        $this->data['to_time'] = $slot->to_time;
+        $this->data['slot_id'] = $slot['id'];
+        $this->data['from_time'] = Carbon::parse($slot['from_time'])->format('H:i');
+        $this->data['res_time'] = Carbon::parse($slot['from_time'])->format('H:i');
         $this->data['user_id'] = isset($this->data['user_id']) ? $this->data['user_id'] : null;
         $this->data['status'] = 'pending';
         $this->data['reservation_id'] = generateReservationId();
         $this->data['reservation_sent'] = 0;
         $this->data['slot_model'] = (isset($this->data['data_model']) && $this->data['data_model'] == 'StoreSlot') ? 'StoreSlot' : 'StoreSlotModified';
         $time_limit = ($meal->time_limit) ? (int)$meal->time_limit : 120;
-        $this->data['end_time'] = Carbon::parse($slot->from_time)->addMinutes($time_limit)->format('H:i');
+        $this->data['end_time'] = Carbon::parse($slot['from_time'])->addMinutes($time_limit)->format('H:i');
 
-        if (strtotime($slot->from_time) > strtotime($this->data['end_time'])) {
+        if (strtotime($slot['from_time']) > strtotime($this->data['end_time'])) {
             $this->data['end_time'] = '23:59';
         }
 
