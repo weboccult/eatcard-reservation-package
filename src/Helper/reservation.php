@@ -527,7 +527,7 @@ if (!function_exists('createNewReservation')) {
 	                    Log::info('Mollie payment gateaway payload : '. json_encode($paymentPayloadData).' | Mollie key : ' .$store->mollie_api_key);
 	                    $payment = Mollie::api()->payments()->create($paymentPayloadData);
                         $storeNewReservation->update(['mollie_payment_id' => $payment->id,/*, 'payment_status'    => 'pending'*/]);
-                        return ['status' => 'success', 'payment' => true, 'data' => $payment->_links->checkout->href, 'code' => 200];
+	                    $paymentUrl = $payment->_links->checkout->href;
                     } else {
                         $data = [
                             'type' => $data['method'] == 'IDEAL' ? 'direct' : 'redirect',
@@ -541,11 +541,8 @@ if (!function_exists('createNewReservation')) {
                             ],
                             'payment_options' => [
                                 'notification_url' => route('booking.webhook.multisafe', ['id' => $storeNewReservation->id, 'store_id' => $store->id]),
-//                                        'notification_url' => 'http://f297e99b22ff.ngrok.io/multisafe/booking-webhook/'+$storeRes->id+'/'+$store->id,
                                 'redirect_url' => route('booking.orders-success.multisafe', ['id' => $storeNewReservation->id, 'store_id' => $store->id, 'url' => $data['url'], 'language' => $data['language']]),
-//                                    'redirect_url' => ' http://f297e99b22ff.ngrok.io/multisafe/booking-success/'+$storeRes->id+'/'+$store->id,
                                 'cancel_url' => route('booking.cancel.multisafe', ['id' => $storeNewReservation->id, 'store_id' => $store->id, 'url' => $data['url'], 'language' => $data['language']]),
-//                                    'cancel_url' => ' http://f297e99b22ff.ngrok.io/multisafe/booking-cancel/'+$storeRes->id+'/'+$store->id,
                                 'close_window' => true,
                             ]
                         ];
@@ -562,7 +559,7 @@ if (!function_exists('createNewReservation')) {
             }
             $new_reservation_data['id'] = $storeNewReservation->id;
             $new_reservation_data['payment'] = true;
-            $new_reservation_data['payment_url'] = $payment['payment_url'];
+            $new_reservation_data['payment_url'] = isset($paymentUrl) ? $paymentUrl : $payment['payment_url'];
             return $new_reservation_data;
         }
     }
