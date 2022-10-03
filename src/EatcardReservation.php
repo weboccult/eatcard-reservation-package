@@ -412,7 +412,7 @@ class EatcardReservation
 			}
 		}
 		//fetch the slot details
-		$slot = dataModelSlots($this->data['data_model'], $this->data['from_time'], $this->data['meal_type']);
+		$slot = dataModelSlots($this->data['data_model'], $this->data['from_time'],$this->data['slot_id'],$this->data['meal_type']);
 		if (isset($slot['error'])) {
 			Log::info("dataModelSlots function get error message");
 			return $slot;

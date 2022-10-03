@@ -243,16 +243,18 @@ if (!function_exists('dataModelSlots')) {
      * @return \Weboccult\EatcardReservation\Facade\EatcardReservation
      * @description On specific slot model based return slot
      */
-    function dataModelSlots($data_model, $from_time, $meal_id)
+    function dataModelSlots($data_model, $from_time,$slot_id, $meal_id)
     {
         //Check store slot and week day wise active or not
         if ($data_model == 'StoreSlot') {
 	        Log::info("Store slot slots");
             $slot = StoreSlot::query()
                 ->where('from_time', $from_time)
+	            ->where('id', $slot_id)
                 ->where('meal_id', $meal_id)
                 ->first();
             if (isset($slot->store_weekdays_id) && $slot->store_weekdays_id != null) {
+	            Log::info("Store Week Day Off Slot : " . json_encode($slot));
                 $store_weekday = StoreWeekDay::query()
                     ->find($slot->store_weekdays_id);
                 if ($store_weekday && $store_weekday->is_active != 1) {
@@ -268,6 +270,7 @@ if (!function_exists('dataModelSlots')) {
         	Log::info("Store slot modified slots");
             $slot = StoreSlotModified::query()
                 ->where('from_time', $from_time)
+	            ->where('id', $slot_id)
                 ->where('meal_id', $meal_id)
                 ->first();
         }
