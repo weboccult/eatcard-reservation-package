@@ -976,9 +976,6 @@ if (!function_exists('getDisable')) {
                             }
                         }
                     }//Compare person availability check
-                    else {
-                        $disable = 'false';
-                    }
                 }//Second loop for section end
             }//If condition smart reservation end
         }//$section foreach end

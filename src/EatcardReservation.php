@@ -234,10 +234,28 @@ class EatcardReservation
 		if ($table->count() == 0) {
 			$this->activeSlots = [];
 		}
+
+		$disable = '';
+		$current24Time = Carbon::now()->format('G:i');
+		// Booking time off for current day checking
+		if ($this->store->is_booking_enable == 1 && $specific_date === Carbon::now()->format('Y-m-d')) {
+			if ($this->store->booking_off_time == "00:00") {
+				$this->store->booking_off_time = "24:00";
+			}
+			Log::info(" current booking time " . $current24Time . $this->store->booking_off_time);
+			// check the booking off time with slot time
+			if (strtotime($current24Time) >= strtotime($this->store->booking_off_time)) {
+				$disable = 'true';
+			}else{
+				$disable = 'false';
+			}
+		}
+
 		Log::info("Slots fetched Successfully!!!");
 		return [
 			"active_slots"     => $this->activeSlots,
-			"booking_off_time" => $this->store->booking_off_time
+			"booking_off_time" => $this->store->booking_off_time,
+			"disable" => $disable
 		];
 	}
 
