@@ -245,9 +245,9 @@ class EatcardReservation
 			Log::info(" current booking time " . $current24Time . $this->store->booking_off_time);
 			// check the booking off time with slot time
 			if (strtotime($current24Time) >= strtotime($this->store->booking_off_time)) {
-				$disable = 'true';
+				$disable = true;
 			}else{
-				$disable = 'false';
+				$disable = false;
 			}
 		}
 
@@ -317,21 +317,29 @@ class EatcardReservation
 			}
 			// Checking if time has been past for today
 			if (strtotime($slot_time) <= strtotime($current24Time)) {
-				$disable = 'true';
-				$class = 'before_msg';
+				return [
+					'code' => '400',
+					'status' => 'error',
+					'error' => 'error_time_has_been_past',
+					'disable' => true
+				];
 			}
 			// check the booking off time with slot time
 			if (strtotime($current24Time) >= strtotime($store->booking_off_time)) {
 				if (strtotime($slot_time) >= strtotime($current24Time)) {
-					$disable = 'true';
-					$class = 'after_msg';
+					return [
+						'code' => '400',
+						'status' => 'error',
+						'error' => 'error_booking_off_time',
+						'disable' => true
+					];
 				}
 			}
 		}
 		$final_available_meals = [];
 		foreach ($slot_active_meals as $meal) {
 			$checkDisable = getDisable($store_id, $specific_date, $person, $meal, $store, $slot_time);
-			if ($checkDisable == 'false') {
+			if ($checkDisable == false) {
 				$final_available_meals[] = $meal;
 			}
 			$disable = $checkDisable;
@@ -637,6 +645,37 @@ class EatcardReservation
 				$this->data['gift_purchase_id'] = $giftCardPrice->id;
 			}
 		}
+
+		$current24Time = Carbon::now()->format('G:i');
+		// Booking time off for current day checking
+		if ($store->is_booking_enable == 1 && $this->data['res_date'] === Carbon::now()->format('Y-m-d')) {
+			if ($store->booking_off_time == "00:00") {
+				$store->booking_off_time = "24:00";
+			}
+
+			// Checking if time has been past for today
+			if (strtotime($this->data['from_time']) <= strtotime($current24Time)) {
+				return [
+					'code' => '400',
+					'status' => 'error',
+					'error' => 'error_time_has_been_past',
+					'disable' => true
+				];
+			}
+
+			// check the booking off time with slot time
+			if (strtotime($current24Time) >= strtotime($store->booking_off_time)) {
+				if (strtotime($this->data['from_time']) >= strtotime($current24Time)) {
+					return [
+						'code' => '400',
+						'status' => 'error',
+						'error' => 'error_booking_off_time',
+						'disable' => true
+					];
+				}
+			}
+		}
+
 		return createNewReservation($meal, $this->data, $data_model, $store);
 	}
 

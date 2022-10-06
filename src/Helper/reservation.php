@@ -923,7 +923,7 @@ if (!function_exists('getDisable')) {
                 $available_table_list = array_diff($tables_id, $table_assign);
                 Log::info("Reservation : Available Table List - " . json_encode($available_table_list));
                 if (!$available_table_list) {
-                    $disable = 'true';
+                    $disable = true;
                     return $disable;
                 }
                 $table_availability = false;
@@ -965,13 +965,13 @@ if (!function_exists('getDisable')) {
                         $match = bestsum($store_table, $person);
                         if ($match && (array_sum($match) == $person || array_sum($match) == $person + 1)) {
                             if ((collect($match)->count() == 1) || ($store->allow_auto_group == 1 && collect($match)->count() > 1)) {
-                                $disable = 'false';
+                                $disable = false;
                             }
                         } else {
                             $match = bestsum($store_table, $person + 1);
                             if ($match && array_sum($match) == $person + 1) {
                                 if ((collect($match)->count() == 1) || ($store->allow_auto_group == 1 && collect($match)->count() > 1)) {
-                                    $disable = 'false';
+                                    $disable = false;
                                 }
                             }
                         }
@@ -1309,7 +1309,7 @@ if (!function_exists('reservedTimeSlot')) {
                         }
                     }
                 } elseif ($remain_seats < $person) {
-                    $disable = 'true';
+                    $disable = true;
                 }
             }
         }
