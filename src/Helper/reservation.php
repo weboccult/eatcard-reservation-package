@@ -243,36 +243,45 @@ if (!function_exists('dataModelSlots')) {
      * @return \Weboccult\EatcardReservation\Facade\EatcardReservation
      * @description On specific slot model based return slot
      */
-    function dataModelSlots($data_model, $from_time,$slot_id, $meal_id)
+    function dataModelSlots($data_model, $from_time, $res_date, $meal_id)
     {
-        //Check store slot and week day wise active or not
+	    $checkDay = Carbon::parse($res_date)->format('l');
+
+	    /Check store slot and week day wise active or not
         if ($data_model == 'StoreSlot') {
 	        Log::info("Store slot slots");
-            $slot = StoreSlot::query()
-                ->where('from_time', $from_time)
-	            ->where('id', $slot_id)
-                ->where('meal_id', $meal_id)
-                ->first();
-            if (isset($slot->store_weekdays_id) && $slot->store_weekdays_id != null) {
-	            Log::info("Store Week Day Off Slot : " . json_encode($slot));
-                $store_weekday = StoreWeekDay::query()
-                    ->find($slot->store_weekdays_id);
-                if ($store_weekday && $store_weekday->is_active != 1) {
-                    Log::info("Store weekday is not active | dataModelSlots function");
-                    return [
-                        'status' => 'error',
-                        'error' => 'error_weekday_frame',
-                        'code'  =>  400,
-                    ];
-                }
-            }
+	        $slot = StoreSlot::query()
+		        ->where('from_time', $from_time)
+		        ->where('meal_id', $meal_id)
+		        ->whereNotNull('store_weekdays_id')
+		        ->first();
+	        if(!empty($slot)){
+		        Log::info("Store week day slot details " . $slot);
+		        $store_weekday = StoreWeekDay::query()
+			        ->where('name', $checkDay)
+			        ->find($slot->store_weekdays_id);
+		        Log::info("Store week day info : " . $store_weekday);
+		        if ($store_weekday && $store_weekday->is_active != 1) {
+			        Log::info("Store weekday is not active | dataModelSlots function");
+			        return [
+				        'status' => 'error',
+				        'error' => 'error_weekday_frame',
+				        'code'  =>  400,
+			        ];
+		        }
+	        }else{
+		        $slot = StoreSlot::query()
+			        ->where('from_time', $from_time)
+			        ->where('meal_id', $meal_id)
+			        ->whereNull('store_weekdays_id')
+			        ->first();
+	        }
         } else {
-        	Log::info("Store slot modified slots");
-            $slot = StoreSlotModified::query()
-                ->where('from_time', $from_time)
-	            ->where('id', $slot_id)
-                ->where('meal_id', $meal_id)
-                ->first();
+	        Log::info("Store slot modified slots");
+	        $slot = StoreSlotModified::query()
+		        ->where('from_time', $from_time)
+		        ->where('meal_id', $meal_id)
+		        ->first();
         }
         return $slot;
     }
@@ -676,7 +685,7 @@ if (!function_exists('modifiedSlotsDates')) {
             ->where('store_id', $store->id)
             ->whereRaw('MONTH(store_date) = ?', $selected_month)
             ->where('is_day_meal', 0)
-            ->where('is_available', 1)
+            ->where('is_available', 0)
             ->orderBy('store_date', 'desc')
             ->pluck('store_date')
             ->toArray();
