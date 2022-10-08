@@ -247,7 +247,7 @@ if (!function_exists('dataModelSlots')) {
     {
 	    $checkDay = Carbon::parse($res_date)->format('l');
 
-	    /Check store slot and week day wise active or not
+	    //Check store slot and week day wise active or not
         if ($data_model == 'StoreSlot') {
 	        Log::info("Store slot slots");
 	        $slot = StoreSlot::query()
