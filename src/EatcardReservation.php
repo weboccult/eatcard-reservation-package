@@ -301,7 +301,11 @@ class EatcardReservation
 				$slotNotMatched[] = $slotMeals['meal_id'];
 			}
 		}
-		$activeMeals = getActiveMeals($slotAvailableMeals, $specific_date, $store_id, $slot_time, $person);
+		$activeMeals = [];
+		if($slot_model == 'StoreSlotModified'){
+		}else {
+			$activeMeals = getActiveMeals($slotAvailableMeals, $specific_date, $store_id, $slot_time, $person);
+		}
 		$slotAvailableMeals += $activeMeals;
 		//Fetch the details of meal based on meals id
 		$slot_active_meals = Meal::query()->where('status', 1)->whereIn('id', $slotAvailableMeals)->get();
@@ -338,7 +342,7 @@ class EatcardReservation
 		}
 		$final_available_meals = [];
 		foreach ($slot_active_meals as $meal) {
-			$checkDisable = getDisable($store_id, $specific_date, $person, $meal, $store, $slot_time);
+			$checkDisable = getDisable($store_id, $specific_date, $person, $meal, $store, $slot_time, $disable);
 			if ($checkDisable == false) {
 				$final_available_meals[] = $meal;
 			}

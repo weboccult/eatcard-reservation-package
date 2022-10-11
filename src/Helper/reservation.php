@@ -860,9 +860,9 @@ if (!function_exists('getDisable')) {
      * @return string
      * @discription Return disable for meal function show or hide
      */
-    function getDisable($store_id, $specific_date, $person, $slot_active_meals, $store, $slot_time)
+    function getDisable($store_id, $specific_date, $person, $slot_active_meals, $store, $slot_time, $disable)
     {
-        $disable = true;
+
         //Reservation check here for limit of person based on available reservation
         $res_id = 0;
         $check_all_reservation = StoreReservation::query()
