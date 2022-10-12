@@ -38,7 +38,7 @@ use function Weboccult\EatcardReservation\Helper\weekOffDay;
 
 class EatcardReservation
 {
-	/**TODO Remove this function
+	/**TODO Remove this functions
 	 * @param $name
 	 * @return mixed
 	 **/
