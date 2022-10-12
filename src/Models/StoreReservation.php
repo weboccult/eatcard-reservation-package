@@ -21,7 +21,7 @@ class StoreReservation extends Model
         'user_id',
         'status',
         'payment_type',
-
+        'company',
         // form fields
         'person',
         'voornaam',
