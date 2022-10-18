@@ -45,6 +45,8 @@ class StoreReservation extends Model
         'is_seated',
         'by_owner',
         'res_origin',
+        'occasions',
+        'occasions_name',
         'check_in_points',
         'is_points_claimed',
         'check_in_points_expired',
