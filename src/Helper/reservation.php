@@ -526,6 +526,16 @@ if (!function_exists('createNewReservation')) {
                 try {
                     if ($data['payment_method_type'] == 'mollie') {
                         Mollie::api()->setApiKey($store->mollie_api_key);
+	                    $webhookUrl = webhookGenerator(env('MOLLIE_WEBHOOK').'/reservation/webhook/', [
+		                    'id' => $storeNewReservation->id,
+		                    'store_id' => $store->id,
+	                    ], ['language' => $data['language']],env('MOLLIE_WEBHOOK'));
+
+	                    $redirectUrl = webhookGenerator(env('MOLLIE_WEBHOOK').'/reservation/success-webhook/', [
+		                    'id' => $storeNewReservation->id,
+		                    'store_id' => $store->id,
+	                    ], ['url' => $data['url'], 'language' => $data['language']],env('MOLLIE_WEBHOOK'));
+
                         $paymentPayloadData = [
 	                        "amount" => [
 		                        "currency" => "EUR",
@@ -533,8 +543,8 @@ if (!function_exists('createNewReservation')) {
 	                        ],
 	                        'method' => $data['method'],
 	                        "description" => "Order #" . $storeNewReservation->reservation_id,
-	                        "redirectUrl" => route('booking.orders-success', ['id' => $storeNewReservation->id, 'store_id' => $store->id, 'url' => $data['url'], 'language' => $data['language']]),
-	                        "webhookUrl" => route('booking.webhook', ['id' => $storeNewReservation->id, 'store_id' => $store->id, 'language' => $data['language']]),
+	                        "redirectUrl" => $redirectUrl,
+	                        "webhookUrl" => $webhookUrl,
 	                        "metadata" => [
 		                        "order_id" => $storeNewReservation->reservation_id,
 	                        ],
@@ -544,6 +554,23 @@ if (!function_exists('createNewReservation')) {
                         $storeNewReservation->update(['mollie_payment_id' => $payment->id,/*, 'payment_status'    => 'pending'*/]);
 	                    $paymentUrl = $payment->_links->checkout->href;
                     } else {
+
+	                    $webhookUrl = webhookGenerator(env('MULTISAFE_WEBHOOK').'/reservation/webhook/', [
+		                    'id' => $storeNewReservation->id,
+		                    'store_id' => $store->id,
+	                    ], ['language' => $data['language']],env('MULTISAFE_WEBHOOK'));
+
+	                    $redirectUrl = webhookGenerator(env('MULTISAFE_WEBHOOK').'/reservation/success/', [
+		                    'id' => $storeNewReservation->id,
+		                    'store_id' => $store->id,
+	                    ], ['url' => $data['url'], 'language' => $data['language']],env('MULTISAFE_WEBHOOK'));
+
+	                    $cancelUrl = webhookGenerator(env('MULTISAFE_WEBHOOK').'/reservation/cancel/', [
+		                    'id' => $storeNewReservation->id,
+		                    'store_id' => $store->id,
+	                    ], ['language' => $data['language']],env('MULTISAFE_WEBHOOK'));
+
+
                         $data = [
                             'type' => $data['method'] == 'IDEAL' ? 'direct' : 'redirect',
                             'currency' => 'EUR',
@@ -555,9 +582,9 @@ if (!function_exists('createNewReservation')) {
                                 'issuer_id' => isset($data['issuer_id']) && $data['method'] == 'IDEAL' ? $data['issuer_id'] : null,
                             ],
                             'payment_options' => [
-                                'notification_url' => route('booking.webhook.multisafe', ['id' => $storeNewReservation->id, 'store_id' => $store->id]),
-                                'redirect_url' => route('booking.orders-success.multisafe', ['id' => $storeNewReservation->id, 'store_id' => $store->id, 'url' => $data['url'], 'language' => $data['language']]),
-                                'cancel_url' => route('booking.cancel.multisafe', ['id' => $storeNewReservation->id, 'store_id' => $store->id, 'url' => $data['url'], 'language' => $data['language']]),
+                                'notification_url' => $webhookUrl,
+                                'redirect_url' => $redirectUrl,
+                                'cancel_url' => $cancelUrl,
                                 'close_window' => true,
                             ]
                         ];
@@ -578,6 +605,45 @@ if (!function_exists('createNewReservation')) {
             return $new_reservation_data;
         }
     }
+}
+
+if(!function_exists('webhookGenerator')) {
+	/**
+	 * @param string $path
+	 * @param array|null $parameters
+	 * @param array|null $queryParam
+	 * @param string|null $system
+	 *
+	 * @return string
+	 */
+	function webhookGenerator(string $path, ?array $parameters, ?array $queryParam = [], string $system = null): string
+	{
+		$domain = $path.$parameters['id'].'/'.$parameters['store_id'];
+		return $domain.buildQueryParams($queryParam);
+	}
+}
+
+if (! function_exists('buildQueryParams')) {
+	/**
+	 * @param $params
+	 *
+	 * @return string
+	 *
+	 * @author Darshit Hedpara
+	 */
+	function buildQueryParams($params): string
+	{
+		if (! empty($params)) {
+			$paramsJoined = [];
+			foreach ($params as $param => $value) {
+				$paramsJoined[] = "$param=$value";
+			}
+
+			return '?'.implode('&', $paramsJoined);
+		} else {
+			return '';
+		}
+	}
 }
 
 if (!function_exists('currentMonthDisabledDatesList')) {
