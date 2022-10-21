@@ -588,6 +588,7 @@ if (!function_exists('createNewReservation')) {
                                 'close_window' => true,
                             ]
                         ];
+                        Log::info('Multisafe payload data : '. json_encode($data));
                         $multisafe = new Multisafe();
                         $payment = $multisafe->postOrder($store->multiSafe->api_key, $data);
                     }
