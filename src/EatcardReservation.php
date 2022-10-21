@@ -99,6 +99,7 @@ class EatcardReservation
 	 */
 	public function getSlotsMonthly()
 	{
+		Log::info('Multisafe webhook domain : '. env('MULTISAFE_WEBHOOK'));
 		$this->store = getStoreBySlug($this->slug);
 		//Find current month & year
 		$current_month = Carbon::now()->format('m');
