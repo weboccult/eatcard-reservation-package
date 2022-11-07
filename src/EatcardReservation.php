@@ -235,7 +235,7 @@ class EatcardReservation
 			$this->activeSlots = [];
 		}
 
-		$disable = '';
+		$disable = false;
 		$current24Time = Carbon::now()->format('G:i');
 		// Booking time off for current day checking
 		if ($this->store->is_booking_enable == 1 && $specific_date === Carbon::now()->format('Y-m-d')) {
@@ -310,8 +310,7 @@ class EatcardReservation
 		//Fetch the details of meal based on meals id
 		$slot_active_meals = Meal::query()->where('status', 1)->whereIn('id', $slotAvailableMeals)->get();
 		$current24Time = Carbon::now()->format('G:i');
-		$disable = '';
-		$class = '';
+		$disable = false;
 		$store = getStoreBySlug($store_slug);
 		// Booking time off for current day checking
 		if ($store->is_booking_enable == 1 && $specific_date === Carbon::now()->format('Y-m-d')) {
@@ -354,7 +353,6 @@ class EatcardReservation
 		}
 		$reservationDetails['meals'] = $final_available_meals;
 		$reservationDetails['disable'] = $disable;
-		$reservationDetails['message'] = $class;
 		return $reservationDetails;
 	}
 
