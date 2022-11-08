@@ -454,6 +454,10 @@ class EatcardReservation
 				'error'  => 'error_slot_frame'
 			];
 		}
+        //check the company selected or not
+        if($this->data['is_company_selected'] == 0){
+            $this->data['company'] = null;
+        }
 		// Make past date and time always disabled then return error message
 		$current24Time = Carbon::now()->format('H:i');
 		if (isset($store) && ($this->data['res_date'] < Carbon::now()

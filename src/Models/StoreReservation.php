@@ -88,6 +88,7 @@ class StoreReservation extends Model
         'res_status',
         'slot_model',
         'title_prefix',
+        'is_company_selected',
     ];
     protected $appends = ['dutch_date','reservation_date'/*, 'res_dutch_date'*/];
 
