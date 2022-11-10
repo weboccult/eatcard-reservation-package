@@ -99,7 +99,7 @@ class StoreReservation extends Model
         static::created(function ($model) {
             $user=getUserDetail();
             $msg = 'Store Reservation Created: (' . $user['role'] . ' (' . $user['name'] . '-' . $user['id'] . ') created a Store Reservation ' . $model->voornaam . ' ' . $model->achternaam . ' | id-' . $model->id . ' for the store ' . $model->store_id . '';
-            Log::info($msg);
+            Log::info($msg . ', IP address : ' . request()->ip(). ', browser : '. request()->header('User-Agent'));
         });
         static::deleted(function ($model) {
             $user=getUserDetail();

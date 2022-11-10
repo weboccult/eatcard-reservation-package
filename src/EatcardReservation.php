@@ -242,7 +242,7 @@ class EatcardReservation
 			if ($this->store->booking_off_time == "00:00") {
 				$this->store->booking_off_time = "24:00";
 			}
-			Log::info(" current booking time " . $current24Time . $this->store->booking_off_time);
+			Log::info(" current booking time " . $current24Time . "Booking off time : " . $this->store->booking_off_time);
 			// check the booking off time with slot time
 			if (strtotime($current24Time) >= strtotime($this->store->booking_off_time)) {
 				$disable = true;
@@ -251,7 +251,7 @@ class EatcardReservation
 			}
 		}
 
-		Log::info("Slots fetched Successfully!!!");
+		Log::info("Slots fetched Successfully!!!" . " | Store Id " . $this->store->id . " | Store Slug " . $this->store->store_slug);
 		return [
 			"active_slots"     => $this->activeSlots,
 			"booking_off_time" => $this->store->booking_off_time,
@@ -458,7 +458,16 @@ class EatcardReservation
         if($this->data['is_company_selected'] == 0){
             $this->data['company'] = null;
         }
-		// Make past date and time always disabled then return error message
+        //Check the is_reservation yes or not
+        if ($store->is_reservation != 1) {
+            Log::warning('Reservation system off due to  : ' . json_encode($store->is_reservation, JSON_PRETTY_PRINT));
+            return [
+                'code'   => '400',
+                'status' => 'error',
+                'error'  => 'error_reservation_off'
+            ];
+        }
+        // Make past date and time always disabled then return error message
 		$current24Time = Carbon::now()->format('H:i');
 		if (isset($store) && ($this->data['res_date'] < Carbon::now()
 					->format('Y-m-d') || ($this->data['res_date'] == Carbon::now()
@@ -608,12 +617,12 @@ class EatcardReservation
 			$this->data['payment_method_type'] = '';
 			$this->data['method'] = '';
 		}
-		Log::info("Meal price null or 0 " . $this->data['payment_method_type'] . $this->data['method']);
+		Log::info("Meal price null or 0 | Meal Id : ". $meal->id . $this->data['payment_method_type'] . $this->data['method']);
 		if (!($meal->payment_type == 1 || $meal->payment_type == 3) && !$meal->price) {
 			$this->data['payment_method_type'] = '';
 			$this->data['method'] = '';
 		}
-		$this->data['created_from'] = 'reservation';
+		$this->data['created_from'] = 'reservation_2';
 		if (!$meal->price && $meal->payment_type != 1 && $meal->payment_type != 3) {
 
 		}

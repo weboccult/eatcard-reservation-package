@@ -176,7 +176,7 @@ if (!function_exists('generalSlots')) {
         }
 
         $activeSlots = superUnique($generalSlot, 'from_time');
-        Log::info("Reservation : General slots - ", $activeSlots);
+        Log::info("Reservation : General slots - ", $activeSlots . " | Store Id " . $store->id . " | Store Slug " . $store->store_slug);
         return $activeSlots;
     }
 }
@@ -206,7 +206,7 @@ if (!function_exists('mealSlots')) {
             }
         }
         if ($storeWeekMeal == [] && $storeIsMeal == []) {
-            Log::info("No any meal for now");
+            Log::info("No any meal for now " . " | Store Id " . $store->id . " | Store Slug " . $store->store_slug);
             return [];
         }
         foreach ($storeWeekMeal as $weekMeal) {
