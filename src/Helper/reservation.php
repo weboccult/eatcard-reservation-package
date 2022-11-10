@@ -129,11 +129,12 @@ if (!function_exists('specificDateSlots')) {
 if (!function_exists('specificDaySlots')) {
     /**
      * @param $store
+     * @param $getDayFromUser
      * @param null $slot_time
      * @return array
      * @description Fetch the Selected Specific day wise slots
      */
-    function specificDaySlots($store, $slot_time = null)
+    function specificDaySlots($store, $getDayFromUser, $slot_time = null)
     {
         $activeSlots = [];
 
@@ -141,6 +142,9 @@ if (!function_exists('specificDaySlots')) {
         $daySlot = StoreSlot::query()
             ->where('store_id', $store->id)
             ->where('store_weekdays_id', '!=', null)
+            ->whereHas('store_weekday', function ($q) use($getDayFromUser) {
+                $q->where('is_active', 1)->where('name', $getDayFromUser);
+            })
             ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id');
 
         if (!is_null($slot_time)) {
@@ -176,7 +180,7 @@ if (!function_exists('generalSlots')) {
         }
 
         $activeSlots = superUnique($generalSlot, 'from_time');
-        Log::info("Reservation : General slots - ", $activeSlots . " | Store Id " . $store->id . " | Store Slug " . $store->store_slug);
+        Log::info("Reservation : General slots - " . json_encode($activeSlots) . " | Store Id " . $store->id . " | Store Slug " . $store->store_slug);
         return $activeSlots;
     }
 }

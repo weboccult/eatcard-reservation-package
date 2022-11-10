@@ -199,11 +199,12 @@ class EatcardReservation
 		$this->activeSlots = [];
 		if ($isSlotModifiedAvailable > 0 && ($slot_model == 'StoreSlotModified' || is_null($slot_model))) {
 			$this->activeSlots = specificDateSlots($this->store, $specific_date, $slot_time, $slot_model);
+            $dateFlag = true;
 		}
 		else if ($dayCheck) {
-			$this->activeSlots = specificDaySlots($this->store, $slot_time);
-			$general_slots = generalSlots($this->store, $slot_time);
-			$this->activeSlots = array_merge($this->activeSlots, $general_slots);
+			$this->activeSlots = specificDaySlots($this->store, $slot_time, $getDayFromUser);
+//			$general_slots = generalSlots($this->store, $slot_time);
+//			$this->activeSlots = array_merge($this->activeSlots, $general_slots);
 			$this->activeSlots = superUnique(collect($this->activeSlots), 'from_time');
 		}
 		else {
@@ -254,6 +255,7 @@ class EatcardReservation
 		Log::info("Slots fetched Successfully!!!" . " | Store Id " . $this->store->id . " | Store Slug " . $this->store->store_slug);
 		return [
 			"active_slots"     => $this->activeSlots,
+            "date"     => $dateFlag ?? false,
 			"booking_off_time" => $this->store->booking_off_time,
 			"disable" => $disable
 		];
