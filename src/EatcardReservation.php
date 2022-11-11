@@ -121,6 +121,14 @@ class EatcardReservation
 		foreach ($ranges as $date) {
 			$dates[] = $date->format('Y-m-d');
 		}
+		//Fetch enable date list
+        $fetchEnableDates = StoreSlotModified::where('store_id', $this->store->id)
+            ->whereYear('store_date', $selected_year)
+            ->whereMonth('store_date', $selected_month)
+            ->pluck('store_date')
+            ->toArray();
+        $enableDates = array_unique($fetchEnableDates,SORT_STRING);
+
 		/*Find selected month disable dates*/
 		$currentMonthDisabledDates = currentMonthDisabledDatesList($this->store, $selected_month);
 		/*Find admin disable day*/
@@ -144,6 +152,7 @@ class EatcardReservation
 		$get_data['month'] = $selected_month;
 		$get_data['First_day_of_month'] = $firstDay;
 		$get_data['all_disable_dates'] = array_values($result);
+        $get_data['all_enable_dates'] = array_values($enableDates);
 		return $get_data;
 	}
 
@@ -199,10 +208,9 @@ class EatcardReservation
 		$this->activeSlots = [];
 		if ($isSlotModifiedAvailable > 0 && ($slot_model == 'StoreSlotModified' || is_null($slot_model))) {
 			$this->activeSlots = specificDateSlots($this->store, $specific_date, $slot_time, $slot_model);
-            $dateFlag = true;
 		}
 		else if ($dayCheck) {
-			$this->activeSlots = specificDaySlots($this->store, $slot_time, $getDayFromUser);
+			$this->activeSlots = specificDaySlots($this->store,$getDayFromUser,$slot_time);
 //			$general_slots = generalSlots($this->store, $slot_time);
 //			$this->activeSlots = array_merge($this->activeSlots, $general_slots);
 			$this->activeSlots = superUnique(collect($this->activeSlots), 'from_time');
@@ -255,7 +263,6 @@ class EatcardReservation
 		Log::info("Slots fetched Successfully!!!" . " | Store Id " . $this->store->id . " | Store Slug " . $this->store->store_slug);
 		return [
 			"active_slots"     => $this->activeSlots,
-            "date"     => $dateFlag ?? false,
 			"booking_off_time" => $this->store->booking_off_time,
 			"disable" => $disable
 		];
