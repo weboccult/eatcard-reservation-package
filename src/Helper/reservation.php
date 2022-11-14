@@ -572,7 +572,7 @@ if (!function_exists('createNewReservation')) {
 	                    $cancelUrl = webhookGenerator(env('MULTISAFE_WEBHOOK').'/reservation/cancel/', [
 		                    'id' => $storeNewReservation->id,
 		                    'store_id' => $store->id,
-	                    ], ['language' => $data['language']],env('MULTISAFE_WEBHOOK'));
+	                    ], ['url' => $data['url'], 'language' => $data['language']],env('MULTISAFE_WEBHOOK'));
 
 
                         $data = [
