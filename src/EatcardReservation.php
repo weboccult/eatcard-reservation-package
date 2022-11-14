@@ -125,6 +125,7 @@ class EatcardReservation
         $fetchEnableDates = StoreSlotModified::where('store_id', $this->store->id)
             ->whereYear('store_date', $selected_year)
             ->whereMonth('store_date', $selected_month)
+            ->where('is_available', 1)
             ->pluck('store_date')
             ->toArray();
         $enableDates = array_unique($fetchEnableDates,SORT_STRING);
