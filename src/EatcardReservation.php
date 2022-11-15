@@ -146,6 +146,13 @@ class EatcardReservation
 			$bookingOffData = $this->checkBookingOffFirstDay($firstDay, $weekOffDates, $this->store);
 			$firstDay = $bookingOffData['firstDayOfMonth'];
 		}
+
+        //When Disable days by admin and enable dates by specific date then remove enable dates
+        if(!empty($disableDayByAdmin)){
+            $allowReservationOverRideDates = array_diff($enableDates, $disableDayByAdmin);
+            $enableDates = $allowReservationOverRideDates;
+        }
+
 		$two_arr_day_week = array_merge($disableDayByAdmin, $weekOffDates);
 		$unique = array_merge($two_arr_day_week, $modifiedSlotsDates);
 		$result = array_merge($currentMonthDisabledDates, array_unique($unique));
