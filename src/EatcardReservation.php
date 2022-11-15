@@ -100,6 +100,14 @@ class EatcardReservation
 	public function getSlotsMonthly()
 	{
 		$this->store = getStoreBySlug($this->slug);
+        if(empty($this->store)) {
+            Log::warning("getSlotsMonthly : Store not be empty !!!");
+            return [
+                'code' => 400,
+                'status' => 'error',
+                'error' => 'store_not_found',
+            ];
+        }
 		//Find current month & year
 		$current_month = Carbon::now()->format('m');
 		$current_year = Carbon::now()->format('Y');
