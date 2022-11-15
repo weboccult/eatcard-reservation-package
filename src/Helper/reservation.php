@@ -1014,7 +1014,7 @@ if (!function_exists('getDisable')) {
                     if (in_array($person, $person_seat_range)) {
                         $table_availability = true;
                     } else if (!$table_availability) {
-                        $disable = "true";
+                        $disable = true;
                     }
                 }
 
