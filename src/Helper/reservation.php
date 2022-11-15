@@ -602,7 +602,7 @@ if (!function_exists('createNewReservation')) {
                     return ['status' => 'error', 'message' => 'something_wrong_payment', 'error' => 'something_wrong_payment'];
                 }
             } elseif ($data['payment_method_type'] == '' && $data['method'] == '') {
-                $payment['payment_url'] = $data['url']. '?status=paid' . '&store=' . $data['store_slug'] . '&type=reservation' . '&reservationid=' . Crypt::encryptString($storeNewReservation->id) . '&language=' . $data['language'];
+                $payment['payment_url'] = $data['url']. '?status=paid' . '&store=' . $data['store_slug'] . '&type=reservation' . '&reservationid=' . base64_encode($storeNewReservation->id) . '&language=' . $data['language'];
             }
             $new_reservation_data['id'] = $storeNewReservation->id;
             $new_reservation_data['payment'] = true;
