@@ -188,6 +188,21 @@ class EatcardReservation
 		$this->store = getStoreBySlug($this->data['store_slug'] ?? $store_slug);
 		$specific_date = $this->data['res_date'] ?? $this->data['date'];
 		$section_id = $this->data['section_id'];
+        $person = $this->data['person'];
+        if(empty($person)){
+            return [
+                    'code' => '400',
+                    'status' => 'error',
+                    'error' => 'error_person_select'
+            ];
+        }
+        if(empty($specific_date)){
+            return [
+                'code' => '400',
+                'status' => 'error',
+                'error' => 'error_date_select'
+            ];
+        }
 		$disableByDay = [];
 		if (Carbon::parse($specific_date)->format('m') == Carbon::now()->format('m')) {
 			$disableByDay = $this->store->getReservationOffDates($this->store);
@@ -300,7 +315,6 @@ class EatcardReservation
 		Log::info("Slots fetched Successfully!!!" . " | Store Id " . $this->store->id . " | Store Slug " . $this->store->store_slug);
 
 		//Check Slot available for meal or not
-        $person = $this->data['person'];
         $availableSlots = [];
         $notShowSlots = [];
         $disable = false;
