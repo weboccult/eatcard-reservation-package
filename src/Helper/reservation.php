@@ -1186,10 +1186,6 @@ if (!function_exists('getDisable')) {
             ->where('display_booking_frame', 1)
             ->get();
 
-        if (empty($sections->count())) {
-            $disable = true;
-        }
-
         foreach ($sections as $section) {
             $section_id[] = $section->id;
             //Table Reservation
