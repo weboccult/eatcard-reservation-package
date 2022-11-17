@@ -1086,6 +1086,50 @@ function checkSlotMealAvailable($store_slug, $specific_date, $person, $slot, $sl
             $daySlot = $daySlot->orderBy('from_time', 'ASC')->get()->toArray();
         }
         $onSlotAvailableAllMealID = collect($daySlot)->pluck('meal_id')->toArray();
+
+        //Meal Slots
+        $allActiveMeal = Meal::query()->where('store_id', $store_id)->where('status', 1)->get();
+
+        foreach ($allActiveMeal as $meal) {
+            if (!$meal->is_meal_res && $meal->is_week_meal_res) {
+                $storeWeekMeal[] = $meal->id;
+            } elseif ($meal->is_meal_res) {
+                $storeIsMeal[] = $meal->id;
+            }
+        }
+        if (empty($storeWeekMeal) && empty($storeIsMeal)) {
+            return $onSlotAvailableAllMealID;
+        }
+        foreach ($storeWeekMeal as $weekMeal) {
+            $dateDayMealSlots = StoreSlot::query()
+                ->where('store_id', $store_id)
+                ->where('meal_id', $weekMeal)
+                ->when(!empty($specific_date) && $specific_date == Carbon::now()->format('Y-m-d'),function ($q){
+                    $q->where('is_slot_disabled', 0);
+                })
+                ->whereHas('store_weekday', function ($q1) use($getDayFromUser){
+                    $q1->where('name', $getDayFromUser)
+                        ->where('is_week_day_meal', 1)
+                        ->where('is_active', 1);
+                })
+                ->where('store_weekdays_id', '!=', null)
+                ->whereHas('store_weekday', function ($q) use ($getDayFromUser) {
+                    $q->where('is_active', 1)->where('name', $getDayFromUser);
+                })
+                ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id');
+
+            if (!is_null($slot_time)) {
+                $dateDayMealSlots = $dateDayMealSlots->where('from_time', $slot_time)->get()->toArray();
+            } else {
+                $dateDayMealSlots = $dateDayMealSlots->orderBy('from_time', 'ASC')->get()->toArray();
+            }
+
+            if ($dateDayMealSlots == null) {
+                $dateDayMealSlots = [];
+            } else {
+                $onSlotAvailableAllMealID = collect($dateDayMealSlots)->pluck('meal_id')->toArray();
+            }
+        }
     }
     if(empty($onSlotAvailableAllMealID)){
         //General Slots
@@ -1105,49 +1149,6 @@ function checkSlotMealAvailable($store_slug, $specific_date, $person, $slot, $sl
         $onSlotAvailableAllMealID = collect($generalSlot)->pluck('meal_id')->toArray();
     }
 
-    //Meal Slots
-    $allActiveMeal = Meal::query()->where('store_id', $store_id)->where('status', 1)->get();
-
-    foreach ($allActiveMeal as $meal) {
-        if (!$meal->is_meal_res && $meal->is_week_meal_res) {
-            $storeWeekMeal[] = $meal->id;
-        } elseif ($meal->is_meal_res) {
-            $storeIsMeal[] = $meal->id;
-        }
-    }
-    if (empty($storeWeekMeal) && empty($storeIsMeal)) {
-        return $onSlotAvailableAllMealID;
-    }
-    foreach ($storeWeekMeal as $weekMeal) {
-        $dateDayMealSlots = StoreSlot::query()
-            ->where('store_id', $store_id)
-            ->where('meal_id', $weekMeal)
-            ->when(!empty($specific_date) && $specific_date == Carbon::now()->format('Y-m-d'),function ($q){
-                $q->where('is_slot_disabled', 0);
-            })
-            ->whereHas('store_weekday', function ($q1) use($getDayFromUser){
-                $q1->where('name', $getDayFromUser)
-                    ->where('is_week_day_meal', 1)
-                    ->where('is_active', 1);
-            })
-            ->where('store_weekdays_id', '!=', null)
-            ->whereHas('store_weekday', function ($q) use ($getDayFromUser) {
-                $q->where('is_active', 1)->where('name', $getDayFromUser);
-            })
-            ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id');
-
-        if (!is_null($slot_time)) {
-            $dateDayMealSlots = $dateDayMealSlots->where('from_time', $slot_time)->get()->toArray();
-        } else {
-            $dateDayMealSlots = $dateDayMealSlots->orderBy('from_time', 'ASC')->get()->toArray();
-        }
-
-        if ($dateDayMealSlots == null) {
-            $dateDayMealSlots = [];
-        } else {
-            $onSlotAvailableAllMealID = collect($dateDayMealSlots)->pluck('meal_id')->toArray();
-        }
-    }
     return $onSlotAvailableAllMealID;
 }
 

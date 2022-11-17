@@ -262,11 +262,9 @@ class EatcardReservation
 		}
 
 		if (empty($this->activeSlots) && $dayCheck) {
-                $this->activeSlots += mealSlots($this->store, $slot_time, $specific_date);
-                if(empty($this->activeSlots)){
-                    $this->activeSlots = specificDaySlots($this->store, $getDayFromUser, $slot_time, $specific_date);
-                    $this->activeSlots = superUnique(collect($this->activeSlots), 'from_time');
-                }
+            $this->activeSlots = specificDaySlots($this->store, $getDayFromUser, $slot_time, $specific_date);
+            $this->activeSlots += mealSlots($this->store, $slot_time, $specific_date);
+            $this->activeSlots = superUnique(collect($this->activeSlots), 'from_time');
 		}
 		if(empty($this->activeSlots)) {
 			$this->activeSlots = generalSlots($this->store, $slot_time, $specific_date);
