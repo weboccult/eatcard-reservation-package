@@ -11,9 +11,11 @@ use Weboccult\EatcardReservation\Models\StoreReservation;
 use Weboccult\EatcardReservation\Models\Meal;
 use Weboccult\EatcardReservation\Models\Store;
 use Carbon\Carbon;
+use Weboccult\EatcardReservation\Models\StoreSlot;
 use Weboccult\EatcardReservation\Models\StoreSlotModified;
 use Weboccult\EatcardReservation\Models\StoreWeekDay;
 use Weboccult\EatcardReservation\Models\Table;
+use function Weboccult\EatcardReservation\Helper\checkSlotMealAvailable;
 use function Weboccult\EatcardReservation\Helper\createNewReservation;
 use function Weboccult\EatcardReservation\Helper\currentMonthDisabledDatesList;
 use function Weboccult\EatcardReservation\Helper\dataModelSlots;
@@ -190,6 +192,15 @@ class EatcardReservation
 		if (Carbon::parse($specific_date)->format('m') == Carbon::now()->format('m')) {
 			$disableByDay = $this->store->getReservationOffDates($this->store);
 		}
+        // If current day is off then return error message
+        if (isset($this->store) && $specific_date == Carbon::now()->format('Y-m-d') && $this->store->reservation_off_chkbx == 1) {
+            Log::info("Today close from Admin");
+            return [
+                "active_slots"     => [],
+                "booking_off_time" => $this->store->booking_off_time,
+                "disable" => false
+            ];
+        }
 		//Specific Date Wise Slots
 		$this->date = $specific_date;
 		$getDayFromUser = date('l', strtotime($specific_date));
@@ -205,6 +216,15 @@ class EatcardReservation
 				$storeIsMeal[] = $meal->id;
 			}
 		}
+		$disableDate = currentMonthDisabledDatesList($this->store, Carbon::now()->format('m'));
+		$fetchDate = in_array($specific_date, $disableDate);
+		if(!empty($fetchDate)){
+            return [
+                "active_slots"     => [],
+                "booking_off_time" => $this->store->booking_off_time,
+                "disable" => false
+            ];
+        }
 		$isSlotModifiedAvailable = StoreSlotModified::query()
 			->where('store_id', $this->store->id)
 			->where('is_day_meal', 0)
@@ -222,19 +242,20 @@ class EatcardReservation
 			}
 		}
 		$this->activeSlots = [];
-		if ($isSlotModifiedAvailable > 0 && ($slot_model == 'StoreSlotModified' || is_null($slot_model))) {
+		if ($isSlotModifiedAvailable > 0 && ($slot_model == 'StoreSlotModified' || empty($slot_model))) {
 			$this->activeSlots = specificDateSlots($this->store, $specific_date, $slot_time, $slot_model);
 		}
-		else if ($dayCheck) {
-			$this->activeSlots = specificDaySlots($this->store,$getDayFromUser,$slot_time);
-//			$general_slots = generalSlots($this->store, $slot_time);
-//			$this->activeSlots = array_merge($this->activeSlots, $general_slots);
-			$this->activeSlots = superUnique(collect($this->activeSlots), 'from_time');
+
+		if (empty($this->activeSlots) && $dayCheck) {
+                $this->activeSlots += mealSlots($this->store, $slot_time, $specific_date);
+                if(empty($this->activeSlots)){
+                    $this->activeSlots = specificDaySlots($this->store, $getDayFromUser, $slot_time, $specific_date);
+                    $this->activeSlots = superUnique(collect($this->activeSlots), 'from_time');
+                }
 		}
-		else {
-			$this->activeSlots = generalSlots($this->store, $slot_time);
+		if(empty($this->activeSlots)) {
+			$this->activeSlots = generalSlots($this->store, $slot_time, $specific_date);
 		}
-		$this->activeSlots += mealSlots($this->store, $slot_time);
 		//Current Time
 		$currentTime = Carbon::now()->format('G:i');
 		if ($specific_date == Carbon::now()->format('Y-m-d')) {
@@ -286,7 +307,13 @@ class EatcardReservation
         foreach($this->activeSlots as $eachSlot){
             if ($eachSlot['max_entries'] == 'unlimited' || $eachSlot['max_entries'] >= $person ) {
 
-                $slot_active_meals = Meal::query()->where('status', 1)->where('id', $eachSlot['meal_id'])->get();
+                $onSlotAvailableAllMealID =  checkSlotMealAvailable($this->store->store_slug, $specific_date, $person, $eachSlot, $eachSlot['from_time'], $eachSlot['data_model']);
+
+                $slot_active_meals = Meal::query()->where('status', 1)->whereIn('id', $onSlotAvailableAllMealID)->get();
+                if (empty($slot_active_meals->count())) {
+                    $disable = true;
+                    continue;
+                }
 
                 $checkDisable = getDisable($this->store->id, $specific_date, $person, $slot_active_meals, $this->store, $eachSlot['from_time'], $disable);
                 $disable = $checkDisable;
@@ -302,7 +329,7 @@ class EatcardReservation
 
             }else{
                 $notShowSlots[] = $eachSlot;
-                Log::info("Not Available slots : " . json_encode($availableSlots));
+                Log::info("Not Available slots : " . json_encode($notShowSlots));
             }
         }
         Log::info("Available slots : " . json_encode($availableSlots));
@@ -345,16 +372,19 @@ class EatcardReservation
 		$store_slug = Store::query()->where('id', $store_id)->pluck('store_slug')->first();
 		//        $this->data[1]['store_slug'] = $store_slug;
 		$availableSlots = $this->slots($store_slug, $slot_time, $slot_model)['active_slots'];
-		foreach ($availableSlots as $slotMeals) {
-			if ($slotMeals['from_time'] == $slot_time) {
-				if ($slotMeals['max_entries'] == 'unlimited' || $slotMeals['max_entries'] >= $person && $slotMeals['from_time'] == $slot_time) {
-					$slotAvailableMeals[] = $slotMeals['meal_id'];
-				}
+
+        $getDayFromUser = date('l', strtotime($specific_date));
+        $onSlotAvailableAllMealID = [];
+
+		foreach ($availableSlots as $slot) {
+			if ($slot['from_time'] == $slot_time) {
+                $onSlotAvailableAllMealID =  checkSlotMealAvailable($store_slug, $specific_date, $person, $slot, $slot_time, $slot_model);
 			}
-			elseif ($slotMeals['from_time'] != $slot_time) {
-				$slotNotMatched[] = $slotMeals['meal_id'];
+			elseif ($slot['from_time'] != $slot_time) {
+				$slotNotMatched[] = $slot['meal_id'];
 			}
 		}
+        $slotAvailableMeals = $onSlotAvailableAllMealID;
 		$activeMeals = [];
 		if($slot_model == 'StoreSlotModified'){
 		}else {
@@ -365,6 +395,9 @@ class EatcardReservation
 		$slot_active_meals = Meal::query()->where('status', 1)->whereIn('id', $slotAvailableMeals)->get();
 		$current24Time = Carbon::now()->format('G:i');
 		$disable = false;
+        if (empty($slot_active_meals->count())) {
+            $disable = true;
+        }
 		$store = getStoreBySlug($store_slug);
 		// Booking time off for current day checking
 		if ($store->is_booking_enable == 1 && $specific_date === Carbon::now()->format('Y-m-d')) {
@@ -443,6 +476,9 @@ class EatcardReservation
 					$q1->where('meal_type', $meal_id);
 				}
 			])->where('store_id', $store->id)->get();
+			if(empty($dinein_categories->count())){
+                $dinein_categories = [];
+            }
 			$week_array = [
 				'Monday'    => 1,
 				'Tuesday'   => 2,
@@ -501,7 +537,7 @@ class EatcardReservation
 		}
 		//Check in slot verify the from time
 		if (!isset($slot['from_time'])) {
-			Log::info('slot not founded : ' . json_encode($slot, JSON_PRETTY_PRINT));
+			Log::warning('slot not founded : ' . json_encode($slot));
 			return [
 				'code'   => '400',
 				'status' => 'error',
@@ -514,7 +550,7 @@ class EatcardReservation
         }
         //Check the is_reservation yes or not
         if ($store->is_reservation != 1) {
-            Log::warning('Reservation system off due to  : ' . json_encode($store->is_reservation, JSON_PRETTY_PRINT));
+            Log::warning('Reservation system off due to  : ' . $store->is_reservation);
             return [
                 'code'   => '400',
                 'status' => 'error',

@@ -70,6 +70,9 @@ if (!function_exists('specificDateSlots')) {
             ->where('is_day_meal', 0)
             ->where('store_date', $specific_date)
             ->where('is_available', 1)
+            ->when($specific_date == Carbon::now()->format('Y-m-d'),function ($q){
+              $q->where('is_slot_disabled', 0);
+            })
             ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id');
 
         if (!is_null($slot_time)) {
@@ -103,8 +106,16 @@ if (!function_exists('specificDateSlots')) {
             $dateDayMealSlots = StoreSlotModified::query()
                 ->where('store_id', $store->id)
                 ->where('meal_id', $dateMeal)
+                ->where('store_date', $specific_date)
+                ->when($specific_date == Carbon::now()->format('Y-m-d'),function ($q){
+                    $q->where('is_slot_disabled', 0);
+                })
                 ->where('is_available', 1)
                 ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id');
+
+            if(empty($dateDayMealSlots)){
+                continue;
+            }
 
             if (!is_null($slot_time)) {
                 $dateDayMealSlots = $dateDayMealSlots->where('from_time', $slot_time)->get()
@@ -134,7 +145,7 @@ if (!function_exists('specificDaySlots')) {
      * @return array
      * @description Fetch the Selected Specific day wise slots
      */
-    function specificDaySlots($store, $getDayFromUser, $slot_time = null)
+    function specificDaySlots($store, $getDayFromUser, $slot_time = null,$specific_date = null)
     {
         $activeSlots = [];
 
@@ -143,7 +154,12 @@ if (!function_exists('specificDaySlots')) {
             ->where('store_id', $store->id)
             ->where('store_weekdays_id', '!=', null)
             ->whereHas('store_weekday', function ($q) use($getDayFromUser) {
-                $q->where('is_active', 1)->where('name', $getDayFromUser);
+                $q->where('is_active', 1)
+                    ->where('name', $getDayFromUser)
+                    ->where('is_week_day_meal', 0);
+            })
+            ->when(!empty($specific_date) && $specific_date == Carbon::now()->format('Y-m-d'),function ($q){
+                $q->where('is_slot_disabled', 0);
             })
             ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id');
 
@@ -165,11 +181,14 @@ if (!function_exists('generalSlots')) {
      * @return array
      * @Description Fetch the all General sots from admin
      */
-    function generalSlots($store, $slot_time = null)
+    function generalSlots($store, $slot_time = null, $specific_date = null)
     {
         $activeSlots = [];
         $generalSlot = StoreSlot::query()
             ->where('store_id', $store->id)
+            ->when(!empty($specific_date) && $specific_date == Carbon::now()->format('Y-m-d'),function ($q){
+                $q->where('is_slot_disabled', 0);
+            })
             ->doesntHave('store_weekday')
             ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id');
 
@@ -191,7 +210,7 @@ if (!function_exists('mealSlots')) {
      * @return array
      * @description Fetch on meal available slots
      */
-    function mealSlots($store, $slot_time = null)
+    function mealSlots($store, $slot_time = null, $specific_date = null)
     {
         $activeSlots = [];
         $storeIsMeal = [];
@@ -205,6 +224,7 @@ if (!function_exists('mealSlots')) {
         foreach ($meals as $meal) {
             if (!$meal->is_meal_res && $meal->is_week_meal_res) {
                 $storeWeekMeal[] = $meal->id;
+                Log::info("storeWeekMeal IDS : " , [$meal->id]);
             } elseif ($meal->is_meal_res) {
                 $storeIsMeal[] = $meal->id;
             }
@@ -213,26 +233,38 @@ if (!function_exists('mealSlots')) {
             Log::info("No any meal for now " . " | Store Id " . $store->id . " | Store Slug " . $store->store_slug);
             return [];
         }
+        $getDayFromDate = date('l', strtotime($specific_date));
+        $dateDayMealSlots = [];
         foreach ($storeWeekMeal as $weekMeal) {
-            $dateDayMealSlots = StoreSlot::query()
+            $dateCurrentDayMealSlots = StoreSlot::query()
                 ->where('store_id', $store->id)
                 ->where('meal_id', $weekMeal)
+                ->when(!empty($specific_date) && $specific_date == Carbon::now()->format('Y-m-d'),function ($q){
+                    $q->where('is_slot_disabled', 0);
+                })
+                ->whereHas('store_weekday', function ($q1) use($getDayFromDate){
+                    $q1->where('name', $getDayFromDate)
+                    ->where('is_week_day_meal', 1)
+                    ->where('is_active', 1);
+                })
                 ->where('store_weekdays_id', '!=', null)
                 ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id');
 
             if (!is_null($slot_time)) {
-                $dateDayMealSlots = $dateDayMealSlots->where('from_time', $slot_time)->get()->toArray();
+                $dateCurrentDayMealSlots = $dateCurrentDayMealSlots->where('from_time', $slot_time)->get()->toArray();
             } else {
-                $dateDayMealSlots = $dateDayMealSlots->orderBy('from_time', 'ASC')->get()->toArray();
+                $dateCurrentDayMealSlots = $dateCurrentDayMealSlots->orderBy('from_time', 'ASC')->get()->toArray();
             }
 
-            if ($dateDayMealSlots == null) {
-                $dateDayMealSlots = [];
-            } else {
-                $dateDayMealSlots = superUnique($dateDayMealSlots, 'from_time');
+            if (!empty($dateCurrentDayMealSlots)) {
+                if(empty($dateDayMealSlots)){
+                    $dateDayMealSlots = superUnique($dateCurrentDayMealSlots, 'from_time');
+                } else {
+                    $dateDayMealSlots = array_merge($dateDayMealSlots, superUnique($dateCurrentDayMealSlots, 'from_time'));
+                }
             }
         }
-        if (isset($dateDayMealSlots)) {
+        if (!empty($dateDayMealSlots)) {
             $activeSlots = $dateDayMealSlots;
             Log::info("Reservation : Admin setting add meals slots list - ", $activeSlots);
         }
@@ -837,6 +869,9 @@ if (!function_exists('getActiveMeals')) {
             ->where('status', 1)
             ->whereIn('id', $slotAvailableMeals)
             ->get();
+        if(empty($active_meals->count())){
+            $active_meals = [];
+        }
         $slotAvailableMeals = [];
         foreach ($active_meals as $meal) {
             $getDayFromUser = date('l', strtotime($specific_date));
@@ -920,6 +955,202 @@ if (!function_exists('getActiveMeals')) {
     }
 }
 
+function checkSlotMealAvailable($store_slug, $specific_date, $person, $slot, $slot_time, $slot_model){
+    $getDayFromUser = date('l', strtotime($specific_date));
+    $onSlotAvailableAllMealID = [];
+
+    if($slot['from_time'] != $slot_time){
+        return $onSlotAvailableAllMealID;
+    }
+    if (($slot['max_entries'] != 'unlimited' && $slot['max_entries'] < $person)) {
+        return $onSlotAvailableAllMealID;
+    }
+
+    /***** 8888888888888888888888888888 Data Preparation 88888888888888888888888888888888 *****/
+    $store = getStoreBySlug($store_slug);
+    $store_id = $store->id;
+
+    //Specific Date Wise Slots
+//    $this->date = $specific_date;
+    $dayCheck = StoreWeekDay::query()->where('store_id', $store->id)->where('name', $getDayFromUser)->first();
+    $meals = Meal::query()->where('store_id', $store->id)->where('status', 1)->get();
+    $storeWeekMeal = [];
+    $storeIsMeal = [];
+
+    foreach ($meals as $meal) {
+        if (!$meal->is_meal_res && $meal->is_week_meal_res) {
+            $storeWeekMeal[] = $meal->id;
+        }
+        elseif ($meal->is_meal_res) {
+            $storeIsMeal[] = $meal->id;
+        }
+    }
+    $isSlotModifiedAvailable = StoreSlotModified::query()
+        ->where('store_id', $store->id)
+        ->where('is_day_meal', 0)
+        ->where('store_date', $specific_date)
+        ->where('is_available', 1);
+    if (!is_null($slot_time)) {
+        $isSlotModifiedAvailable = $isSlotModifiedAvailable->where('from_time', $slot_time)->count();
+    }
+    else {
+        $isSlotModifiedAvailable = $isSlotModifiedAvailable->count();
+    }
+    foreach ($meals as $meal) {
+        if ($meal->is_meal_res) {
+            $isSlotModifiedAvailable = 1;
+        }
+    }
+    /***** 88888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888 *****/
+    if ($isSlotModifiedAvailable > 0 && ($slot_model == 'StoreSlotModified')) {
+        $dateMealSlotsData = StoreSlotModified::query()
+            ->where('store_id', $store_id)
+            ->where('is_day_meal', 0)
+            ->where('store_date', $specific_date)
+            ->when($specific_date == Carbon::now()->format('Y-m-d'),function ($q){
+                $q->where('is_slot_disabled', 0);
+            })
+            ->where('is_available', 1)
+            ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id');
+
+        if (!is_null($slot_time)) {
+            $dateMealSlotsData = $dateMealSlotsData->where('from_time', $slot_time)->get()->toArray();
+        } else {
+            $dateMealSlotsData = $dateMealSlotsData->orderBy('from_time', 'ASC')->get()->toArray();
+        }
+        $onSlotAvailableAllMealID = collect($dateMealSlotsData)->pluck('meal_id')->toArray();
+
+        //In Active Meal Specific Date vise slot
+        $meals = Meal::query()
+            ->where('store_id', $store_id)
+            ->where('status', 1)
+            ->get();
+
+        $storeWeekMeal = [];
+        $storeIsMeal = [];
+        $dateDayMealSlots = [];
+
+        foreach ($meals as $meal) {
+            if (!$meal->is_meal_res && $meal->is_week_meal_res) {
+                $storeWeekMeal[] = $meal->id;
+            } elseif ($meal->is_meal_res) {
+                $storeIsMeal[] = $meal->id;
+            }
+        }
+        if (empty($storeWeekMeal) && empty($storeIsMeal)) {
+            return $onSlotAvailableAllMealID;
+        }
+        foreach ($storeIsMeal as $dateMeal) {
+            $dateDayMealSlots = StoreSlotModified::query()
+                ->where('store_id', $store_id)
+                ->where('meal_id', $dateMeal)
+                ->where('store_date', $specific_date)
+                ->when($specific_date == Carbon::now()->format('Y-m-d'),function ($q){
+                    $q->where('is_slot_disabled', 0);
+                })
+                ->where('is_available', 1)
+                ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id');
+
+            if (!empty($slot_time)) {
+                $dateDayMealSlots = $dateDayMealSlots->where('from_time', $slot_time)->get()
+                    ->toArray();
+            } else {
+                $dateDayMealSlots = $dateDayMealSlots->orderBy('from_time', 'ASC')->get()
+                    ->toArray();
+            }
+            if(empty($dateDayMealSlots)){
+                continue;
+            }
+            if ($dateDayMealSlots == null) {
+                $dateDayMealSlots = [];
+            } else {
+                $onSlotAvailableAllMealID = collect($dateDayMealSlots)->pluck('meal_id')->toArray();
+            }
+        }
+    }
+    if (empty($onSlotAvailableAllMealID) && $dayCheck) {
+        //Specific Day wise slots
+        $daySlot = StoreSlot::where('store_id', $store_id)
+            ->where('store_weekdays_id', '!=', null)
+            ->when(!empty($specific_date) && $specific_date == Carbon::now()->format('Y-m-d'),function ($q){
+                $q->where('is_slot_disabled', 0);
+            })
+            ->whereHas('store_weekday', function ($q) use ($getDayFromUser) {
+                $q->where('is_active', 1)->where('name', $getDayFromUser)->where('is_week_day_meal', 0);
+            })
+            ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id');
+
+        if (!empty($slot_time)) {
+            $daySlot = $daySlot->where('from_time', $slot_time)->get()->toArray();
+        } else {
+            $daySlot = $daySlot->orderBy('from_time', 'ASC')->get()->toArray();
+        }
+        $onSlotAvailableAllMealID = collect($daySlot)->pluck('meal_id')->toArray();
+    }
+    if(empty($onSlotAvailableAllMealID)){
+        //General Slots
+        $generalSlot = StoreSlot::query()
+            ->where('store_id', $store_id)
+            ->when(!empty($specific_date) && $specific_date == Carbon::now()->format('Y-m-d'),function ($q){
+                $q->where('is_slot_disabled', 0);
+            })
+            ->doesntHave('store_weekday')
+            ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id');
+
+        if (!empty($slot_time)) {
+            $generalSlot = $generalSlot->where('from_time', $slot_time)->get()->toArray();
+        } else {
+            $generalSlot = $generalSlot->orderBy('from_time', 'ASC')->get()->toArray();
+        }
+        $onSlotAvailableAllMealID = collect($generalSlot)->pluck('meal_id')->toArray();
+    }
+
+    //Meal Slots
+    $allActiveMeal = Meal::query()->where('store_id', $store_id)->where('status', 1)->get();
+
+    foreach ($allActiveMeal as $meal) {
+        if (!$meal->is_meal_res && $meal->is_week_meal_res) {
+            $storeWeekMeal[] = $meal->id;
+        } elseif ($meal->is_meal_res) {
+            $storeIsMeal[] = $meal->id;
+        }
+    }
+    if (empty($storeWeekMeal) && empty($storeIsMeal)) {
+        return $onSlotAvailableAllMealID;
+    }
+    foreach ($storeWeekMeal as $weekMeal) {
+        $dateDayMealSlots = StoreSlot::query()
+            ->where('store_id', $store_id)
+            ->where('meal_id', $weekMeal)
+            ->when(!empty($specific_date) && $specific_date == Carbon::now()->format('Y-m-d'),function ($q){
+                $q->where('is_slot_disabled', 0);
+            })
+            ->whereHas('store_weekday', function ($q1) use($getDayFromUser){
+                $q1->where('name', $getDayFromUser)
+                    ->where('is_week_day_meal', 1)
+                    ->where('is_active', 1);
+            })
+            ->where('store_weekdays_id', '!=', null)
+            ->whereHas('store_weekday', function ($q) use ($getDayFromUser) {
+                $q->where('is_active', 1)->where('name', $getDayFromUser);
+            })
+            ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id');
+
+        if (!is_null($slot_time)) {
+            $dateDayMealSlots = $dateDayMealSlots->where('from_time', $slot_time)->get()->toArray();
+        } else {
+            $dateDayMealSlots = $dateDayMealSlots->orderBy('from_time', 'ASC')->get()->toArray();
+        }
+
+        if ($dateDayMealSlots == null) {
+            $dateDayMealSlots = [];
+        } else {
+            $onSlotAvailableAllMealID = collect($dateDayMealSlots)->pluck('meal_id')->toArray();
+        }
+    }
+    return $onSlotAvailableAllMealID;
+}
+
 if (!function_exists('getDisable')) {
     /**
      * @param $store_id
@@ -954,6 +1185,10 @@ if (!function_exists('getDisable')) {
             ->where('status', 1)
             ->where('display_booking_frame', 1)
             ->get();
+
+        if (empty($sections->count())) {
+            $disable = true;
+        }
 
         foreach ($sections as $section) {
             $section_id[] = $section->id;
@@ -1030,6 +1265,9 @@ if (!function_exists('getDisable')) {
                     $get_section = $get_section->where('id', $section_id);
                 }
                 $sections = $get_section->get();
+                if (empty($sections->count())) {
+                    $disable = true;
+                }
                 Log::info("Reservation : Available Sections - " . json_encode($sections));
                 foreach ($sections as $section_str) {
                     $store_table = [];
@@ -1317,6 +1555,10 @@ if (!function_exists('reservedTimeSlot')) {
             $sections = $sections->where('dining_areas.id', $data['section_id']);
         }
         $sections = $sections->get();
+
+        if (empty($sections->count())) {
+            $disable = true;
+        }
 
         if ($store->is_table_mgt_enabled == 1 && $sections->count() > 0) {
             $total_seat = 0;
