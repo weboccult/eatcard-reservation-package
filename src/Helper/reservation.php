@@ -1039,9 +1039,7 @@ function checkSlotMealAvailable($store_slug, $specific_date, $person, $slot, $sl
                 $storeIsMeal[] = $meal->id;
             }
         }
-        if (empty($storeWeekMeal) && empty($storeIsMeal)) {
-            return $onSlotAvailableAllMealID;
-        }
+
         foreach ($storeIsMeal as $dateMeal) {
             $dateDayMealSlots = StoreSlotModified::query()
                 ->where('store_id', $store_id)
@@ -1099,9 +1097,7 @@ function checkSlotMealAvailable($store_slug, $specific_date, $person, $slot, $sl
                 $storeIsMeal[] = $meal->id;
             }
         }
-        if (empty($storeWeekMeal) && empty($storeIsMeal)) {
-            return $onSlotAvailableAllMealID;
-        }
+
         foreach ($storeWeekMeal as $weekMeal) {
             $dateDayMealSlots = StoreSlot::query()
                 ->where('store_id', $store_id)
