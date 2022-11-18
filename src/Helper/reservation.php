@@ -1181,11 +1181,11 @@ if (!function_exists('getDisable')) {
         $sections = DiningArea::query()
             ->where('store_id', $store_id)
             ->where('status', 1)
-            ->where('display_booking_frame', 1)
+//            ->where('display_booking_frame', 1)
             ->get();
 
         foreach ($sections as $section) {
-            $section_id[] = $section->id;
+            $section_id = $section->id;
             //Table Reservation
             if ($store->is_table_mgt_enabled == 1 && $store->is_smart_res) {
                 $check_table = Table::query()
@@ -1193,7 +1193,7 @@ if (!function_exists('getDisable')) {
                         $q1->where('store_id', $store->id)
                             ->where('status', 1);
                     })->where('status', 1)->where('online_status', 1);
-                if ($section_id != null) {
+                if (!empty($section_id)) {
                     $check_table = $check_table->where('dining_area_id', $section_id);
                 }
 
@@ -1233,7 +1233,9 @@ if (!function_exists('getDisable')) {
                 Log::info("Reservation : Available Table List - " . json_encode($available_table_list));
                 if (!$available_table_list) {
                     $disable = true;
-                    return $disable;
+                    Log::info("------No1");
+                    continue;
+
                 }
                 $table_availability = false;
                 foreach ($available_table_list as $empty_table) {
@@ -1261,9 +1263,10 @@ if (!function_exists('getDisable')) {
                 $sections = $get_section->get();
                 if (empty($sections->count())) {
                     $disable = true;
+                    continue;
                 }
-                Log::info("Reservation : Available Sections - " . json_encode($sections));
-                foreach ($sections as $section_str) {
+
+                $section_str = $section;
                     $store_table = [];
                     $total = 0;
                     foreach ($section_str->tables as $table) {
@@ -1278,19 +1281,20 @@ if (!function_exists('getDisable')) {
                         if ($match && (array_sum($match) == $person || array_sum($match) == $person + 1)) {
                             if ((collect($match)->count() == 1) || ($store->allow_auto_group == 1 && collect($match)->count() > 1)) {
                                 $disable = false;
+                                break;
                             }
                         } else {
                             $match = bestsum($store_table, $person + 1);
                             if ($match && array_sum($match) == $person + 1) {
                                 if ((collect($match)->count() == 1) || ($store->allow_auto_group == 1 && collect($match)->count() > 1)) {
                                     $disable = false;
+                                    break;
                                 }
                             }
                         }
                     }//Compare person availability check
                 }//Second loop for section end
             }//If condition smart reservation end
-        }//$section foreach end
         return $disable;
     }
 }
@@ -1555,6 +1559,7 @@ if (!function_exists('reservedTimeSlot')) {
             return ['disable' => true];
         }
 
+
         if ($store->is_table_mgt_enabled == 1 && $sections->count() > 0) {
             $total_seat = 0;
             foreach ($sections as $section) {
@@ -1603,7 +1608,9 @@ if (!function_exists('reservedTimeSlot')) {
             }
 
             if ($remain_seats >= $person) {
+                $disable = true;
                 foreach ($sections as $section) {
+
                     $section_wise_seat = 0;
                     $reservation_seat = 0;
                     foreach ($section->tables as $table) {
@@ -1625,8 +1632,9 @@ if (!function_exists('reservedTimeSlot')) {
                         }
                     }
                     $remaining_seat = $section_wise_seat - $reservation_seat;
-                    if ($remaining_seat < $person) {
-                        return ["slot_disable" => true];
+                    if ($remaining_seat >= $person) {
+                        $disable = false;
+                        break;
                     }
                 }
             }
