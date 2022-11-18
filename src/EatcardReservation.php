@@ -24,6 +24,7 @@ use function Weboccult\EatcardReservation\Helper\generateRandomNumberV2;
 use function Weboccult\EatcardReservation\Helper\generateReservationId;
 use function Weboccult\EatcardReservation\Helper\getActiveMeals;
 use function Weboccult\EatcardReservation\Helper\getAnotherMeetingUsingIgnoringArrangementTime;
+use function Weboccult\EatcardReservation\Helper\getTotalPersonFromReservations;
 use function Weboccult\EatcardReservation\Helper\isValidReservation;
 use function Weboccult\EatcardReservation\Helper\remainingSeatCheckDisable;
 use function Weboccult\EatcardReservation\Helper\tableAssign;
@@ -401,14 +402,13 @@ class EatcardReservation
 			$slot_time = $this->data['slot_time'];
 		}
 		$slot_model = $this->data['slot_model'];
-		$slotAvailableMeals = [];
+		$slotAvailableMealsIds = [];
 		$section_id = $this->data['section_id'];
 		$store_slug = Store::query()->where('id', $store_id)->pluck('store_slug')->first();
 		//        $this->data[1]['store_slug'] = $store_slug;
 		$availableSlots = $this->slots($store_slug, $slot_time, $slot_model)['active_slots'];
 
         $getDayFromUser = date('l', strtotime($specific_date));
-        $onSlotAvailableAllMealID = [];
 
         $check_all_reservation = StoreReservation::query()
             ->with('tables.table.diningArea', 'meal')
@@ -422,23 +422,16 @@ class EatcardReservation
             ->get();
 
 		foreach ($availableSlots as $slot) {
-			if ($slot['from_time'] == $slot_time) {
-                $onSlotAvailableAllMealID =  checkSlotMealAvailable($store_slug, $specific_date, $person, $slot, $slot_time, $slot_model);
-			}
-			elseif ($slot['from_time'] != $slot_time) {
-				$slotNotMatched[] = $slot['meal_id'];
-			}
-		}
-        $slotAvailableMeals = $onSlotAvailableAllMealID;
+            $slotAvailableMealsIds = checkSlotMealAvailable($store_slug, $specific_date, $person, $slot, $slot_time, $slot_model);
+        }
 		$activeMeals = [];
-		if($slot_model == 'StoreSlotModified'){
-		}else {
-			$activeMeals = getActiveMeals($slotAvailableMeals, $specific_date, $store_id, $slot_time, $person);
-		}
-
-		$slotAvailableMeals += $activeMeals;
+//		if($slot_model == 'StoreSlotModified'){
+//		}else {
+//			$activeMeals = getActiveMeals($specific_date, $store_id, $slot_time, $person,$check_all_reservation);
+//		}
+//		$slotAvailableMealsIds += $activeMeals;
 		//Fetch the details of meal based on meals id
-		$slot_active_meals = Meal::query()->where('status', 1)->whereIn('id', $slotAvailableMeals)->get();
+		$slot_active_meals = Meal::query()->where('status', 1)->whereIn('id', $slotAvailableMealsIds)->get();
 		$current24Time = Carbon::now()->format('G:i');
 		$disable = false;
         if (empty($slot_active_meals->count())) {
@@ -472,25 +465,94 @@ class EatcardReservation
 				}
 			}
 		}
-		$final_available_meals = [];
 		foreach ($slot_active_meals as $meal) {
+
+		    //find this meal slot in modified date
+		    $getAllSlotOfCurrentMeal = StoreSlotModified::query()
+                    ->where('store_id',$store_id)
+                    ->where('meal_id',$meal['id'])
+                    ->where('from_time',$slot_time)
+                    ->first();
+
+		    $type = 'date';
+
+		    if (empty($getAllSlotOfCurrentMeal)) {
+
+                //find this meal slot in specific day meal
+                    $getAllSlotOfCurrentMeal = StoreSlot::query()
+                        ->where('store_id', $store_id)
+                        ->where('meal_id', $meal['id'])
+                        ->where('store_weekdays_id', '!=', null)
+                        ->when(!empty($specific_date) && $specific_date == Carbon::now()->format('Y-m-d'), function ($q) {
+                            $q->where('is_slot_disabled', 0);
+                        })
+                        ->whereHas('store_weekday', function ($q) use ($getDayFromUser) {
+                            $q->where('is_active', 1)
+                                ->where('is_week_day_meal', 1)
+                                ->where('name', $getDayFromUser);
+                        })
+                        ->where('from_time', $slot_time)
+                        ->first();
+
+                    $type = 'meal day';
+            }
+
+            if (empty($getAllSlotOfCurrentMeal)) {
+
+                //find this meal slot in specific day
+                $getAllSlotOfCurrentMeal = StoreSlot::query()
+                    ->where('store_id',$store_id)
+                    ->where('store_weekdays_id', '!=', null)
+                    ->whereHas('store_weekday', function ($q) use($getDayFromUser) {
+                        $q->where('is_active', 1)
+                            ->where('is_week_day_meal', 0)
+                            ->where('name', $getDayFromUser);
+                    })
+                    ->where('meal_id',$meal['id'])
+                    ->where('from_time',$slot_time)
+                    ->first();
+                $type = 'day';
+            }
+
+            if (empty($getAllSlotOfCurrentMeal)) {
+
+                //find this meal slot in general slot
+
+                $getAllSlotOfCurrentMeal = StoreSlot::query()
+                    ->where('store_id', $store->id)
+                    ->when(!empty($specific_date) && $specific_date == Carbon::now()->format('Y-m-d'),function ($q){
+                        $q->where('is_slot_disabled', 0);
+                    })
+                    ->doesntHave('store_weekday')
+                    ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id')
+                    ->where('meal_id',$meal['id'])
+                    ->where('from_time',$slot_time)
+                    ->first();
+                $type = 'general';
+            }
+
+            $assign_person = getTotalPersonFromReservations ($check_all_reservation,$meal,$slot_time);
+            if ($getAllSlotOfCurrentMeal['max_entries'] != 'unlimited' && (int)$getAllSlotOfCurrentMeal['max_entries'] - $assign_person < $person) {
+                $meal['is_disable_meal'] = true;
+                continue;
+            }
+
 			$checkDisable = getDisable($store_id, $specific_date, $person, $meal, $store, $slot_time, $disable,$check_all_reservation);
 			if ($checkDisable == false) {
-				$final_available_meals[] = $meal;
-			}
+                $currentSlot = collect($availableSlots)->first();
+                $disableStatus = remainingSeatCheckDisable($store_id, $specific_date, $meal, $person, $store, $disable, $this->data,$currentSlot,$check_all_reservation);
+                if(isset($disableStatus['slot_disable'])){
+                    $meal['is_disable_meal'] = true;
+
+                }else{
+                    $meal['is_disable_meal'] = $disableStatus['disable'];
+                }
+			} else {
+                $meal['is_disable_meal'] = true;
+            }
 			$disable = $checkDisable;
 		}
-		foreach ($final_available_meals as $meal) {
-		    $currentSlot = collect($availableSlots)->first();
-			$disableStatus = remainingSeatCheckDisable($store_id, $specific_date, $meal, $person, $store, $disable, $this->data,$currentSlot,$check_all_reservation);
-            if(isset($disableStatus['slot_disable'])){
-                $disable = true;
-            }else{
-                $disable = $disableStatus['disable'];
-            }
-		}
-		$reservationDetails['meals'] = $final_available_meals;
-		$reservationDetails['disable'] = $disable;
+		$reservationDetails['meals'] = $slot_active_meals;
 		return $reservationDetails;
 	}
 

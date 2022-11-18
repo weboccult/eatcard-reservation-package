@@ -861,17 +861,17 @@ if (!function_exists('getActiveMeals')) {
      * @return array
      * @description Get only active meals based on slot
      */
-    function getActiveMeals($slotAvailableMeals, $specific_date, $store_id, $slot_time, $person)
+    function getActiveMeals($specific_date, $store_id, $slot_time, $person,$check_all_reservation)
     {
         Log::info("Reservation : Active Meals Function Start in Helper");
         //Fetch the active status meal
         $active_meals = Meal::query()
             ->where('status', 1)
-            ->whereIn('id', $slotAvailableMeals)
+//            ->whereIn('id', $slotAvailableMeals)
             ->get();
-        if(empty($active_meals->count())){
-            $active_meals = [];
-        }
+//        if(empty($active_meals->count())){
+//            $active_meals = [];
+//        }
         $slotAvailableMeals = [];
         foreach ($active_meals as $meal) {
             $getDayFromUser = date('l', strtotime($specific_date));
@@ -900,11 +900,13 @@ if (!function_exists('getActiveMeals')) {
                 $isSlotModifiedAvailable = $isSlotModifiedAvailable->get()->toArray();
             }
 
+            $assign_person = getTotalPersonFromReservations ($check_all_reservation,$meal,$slot_time);
+
             Log::info("Reservation : Day slot exist - " . json_encode($isDaySlotExist));
             if (count($isSlotModifiedAvailable) > 1) {
                 foreach ($isSlotModifiedAvailable as $slotMeals) {
-                    $reservations = StoreReservation::query()->where('meal_type', $slotMeals['meal_id'])->where('status', 'approved')->where('is_checkout', 0)->where('from_time', $slot_time)->get();
-                    $assign_person = $reservations->sum('person');
+//                    $reservations = StoreReservation::query()->where('meal_type', $slotMeals['meal_id'])->where('status', 'approved')->where('is_checkout', 0)->where('from_time', $slot_time)->get();
+//                    $assign_person = $reservations->sum('person');
                     if ($slotMeals['max_entries'] == 'unlimited' || (int)$slotMeals['max_entries'] - $assign_person >= $person) {
                         $slotAvailableMeals[] = $slotMeals['meal_id'];
                     }
@@ -929,12 +931,13 @@ if (!function_exists('getActiveMeals')) {
                     ->toArray();
 
                 foreach ($daySlot as $slotMeals) {
-                    if ($slotMeals['max_entries'] == 'unlimited' || $slotMeals['max_entries'] >= $person) {
+                    if ($slotMeals['max_entries'] == 'unlimited' || (int)$slotMeals['max_entries'] - $assign_person >= $person) {
                         $slotAvailableMeals[] = $slotMeals['meal_id'];
                     }
                 }
                 Log::info("Reservation : Specific Day wise slots based on available meals - " . json_encode($slotAvailableMeals));
             } else {
+
                 //General Slots
                 $generalSlot = StoreSlot::query()
                     ->where('store_id', $store_id)
@@ -944,7 +947,7 @@ if (!function_exists('getActiveMeals')) {
                     ->get();
                 foreach ($generalSlot as $slotMeals) {
 //                    $reservations = StoreReservation::query()->where('meal_id', $slotMeals['id'])->where('from_time', $slot_time)->count();
-                    if ($slotMeals['max_entries'] == 'unlimited' || $slotMeals['max_entries'] >= $person) {
+                    if ($slotMeals['max_entries'] == 'unlimited' || (int)$slotMeals['max_entries'] - $assign_person >= $person) {
                         $slotAvailableMeals[] = $slotMeals['meal_id'];
                     }
                 }
@@ -965,7 +968,6 @@ function checkSlotMealAvailable($store_slug, $specific_date, $person, $slot, $sl
     if (($slot['max_entries'] != 'unlimited' && $slot['max_entries'] < $person)) {
         return $onSlotAvailableAllMealID;
     }
-
     /***** 8888888888888888888888888888 Data Preparation 88888888888888888888888888888888 *****/
     $store = getStoreBySlug($store_slug);
     $store_id = $store->id;
@@ -1118,16 +1120,16 @@ function checkSlotMealAvailable($store_slug, $specific_date, $person, $slot, $sl
                 })
                 ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id');
 
-            if (!is_null($slot_time)) {
+            if (!empty($slot_time)) {
                 $dateDayMealSlots = $dateDayMealSlots->where('from_time', $slot_time)->get()->toArray();
             } else {
                 $dateDayMealSlots = $dateDayMealSlots->orderBy('from_time', 'ASC')->get()->toArray();
             }
 
-            if ($dateDayMealSlots == null) {
-                $dateDayMealSlots = [];
-            } else {
+            if(empty($onSlotAvailableAllMealID)){
                 $onSlotAvailableAllMealID = collect($dateDayMealSlots)->pluck('meal_id')->toArray();
+            } else {
+                $onSlotAvailableAllMealID = array_unique(array_merge($onSlotAvailableAllMealID, collect($dateDayMealSlots)->pluck('meal_id')->toArray()));
             }
         }
     }
@@ -1232,7 +1234,6 @@ if (!function_exists('getDisable')) {
                 }
 
                 $available_table_list = array_diff($tables_id, $table_assign);
-//                dd($available_table_list);
                 Log::info("Reservation : Available Table List - " . json_encode($available_table_list));
                 if (!$available_table_list) {
                     $disable = true;
@@ -2059,4 +2060,23 @@ if (!function_exists('appDutchDay2Letter')) {
 		];
 		return $dutchDayNames[$day];
 	}
+}
+
+function getTotalPersonFromReservations ($check_all_reservation,$meal,$slot_time) {
+    $time_limit_of_reservation = (isset($meal->time_limit) && $meal->time_limit) ? $meal->time_limit : 120;
+    //Slot End Time of the
+    $end_time = Carbon::parse($slot_time)
+        ->addMinutes($time_limit_of_reservation)
+        ->format('H:i');
+    if ($end_time == '00:00') {
+        $end_time = '24:00';
+    } elseif (strtotime($end_time) < strtotime($slot_time)) {
+        $end_time = '24:00';
+    }
+
+    return collect($check_all_reservation)->filter(function ($reservation) use($slot_time,$end_time) {
+        return (strtotime($slot_time) > strtotime($reservation->from_time) && strtotime($slot_time) < strtotime($reservation->end_time)) ||
+            (strtotime($reservation->from_time) > strtotime($slot_time) && strtotime($reservation->from_time) < strtotime($end_time))  ||
+            (strtotime($slot_time) == strtotime($reservation->from_time));
+    })->sum('person');
 }
