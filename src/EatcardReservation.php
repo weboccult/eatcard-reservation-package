@@ -188,7 +188,7 @@ class EatcardReservation
 		$this->store = getStoreBySlug($this->data['store_slug'] ?? $store_slug);
 		$specific_date = $this->data['res_date'] ?? $this->data['date'];
 		$section_id = $this->data['section_id'];
-        $person = $this->data['person'];
+        $person = (int)($this->data['person'] ?? 0);
         if(empty($person)){
             return [
                     'code' => '400',
@@ -316,22 +316,44 @@ class EatcardReservation
         $availableSlots = [];
         $notShowSlots = [];
         $disable = false;
-        foreach($this->activeSlots as $eachSlot){
+
+        $check_all_reservation = StoreReservation::query()
+            ->with('tables.table.diningArea', 'meal')
+            ->where('store_id', $this->store->id)
+            ->where('res_date', $specific_date)
+            ->whereNotIn('status', ['declined', 'cancelled'])
+            ->where(function ($q1) {
+                $q1->whereIn('local_payment_status', ['paid', '', 'pending'])->orWhere('total_price', null);
+            })
+            ->where('is_seated', '!=', 2)
+            ->get();
+
+        foreach($this->activeSlots as $slotKey => $eachSlot){
             if ($eachSlot['max_entries'] == 'unlimited' || $eachSlot['max_entries'] >= $person ) {
 
                 $onSlotAvailableAllMealID =  checkSlotMealAvailable($this->store->store_slug, $specific_date, $person, $eachSlot, $eachSlot['from_time'], $eachSlot['data_model']);
 
                 $slot_active_meals = Meal::query()->where('status', 1)->whereIn('id', $onSlotAvailableAllMealID)->get();
+
                 if (empty($slot_active_meals->count())) {
                     $disable = true;
                     continue;
                 }
 
-                $checkDisable = getDisable($this->store->id, $specific_date, $person, $slot_active_meals, $this->store, $eachSlot['from_time'], $disable);
-                $disable = $checkDisable;
+                $checkSlotTableAvailable = getDisable($this->store->id, $specific_date, $person, $slot_active_meals, $this->store, $eachSlot['from_time'], $disable,$check_all_reservation);
 
-                $disableStatus = remainingSeatCheckDisable($this->store->id, $specific_date, $slot_active_meals, $person, $this->store, $disable, $this->data);
-                $disable = $disableStatus['disable'];
+                if (!$checkSlotTableAvailable) {
+                    $disableStatus = remainingSeatCheckDisable($this->store->id, $specific_date, $slot_active_meals, $person, $this->store, $disable, $this->data,$eachSlot,$check_all_reservation);
+                } else {
+                    $disableStatus['slot_disable'] = true;
+                }
+
+                if(isset($disableStatus['slot_disable'])){
+                 $this->activeSlots[$slotKey]['is_slot_disabled'] = 1;
+                    $eachSlot['is_slot_disabled'] = 1;
+                }else{
+                    $disable = $disableStatus['disable'];
+                }
 
                 if($disable == true){
                     $notShowSlots[] = $eachSlot;
@@ -371,7 +393,7 @@ class EatcardReservation
 		else {
 			$specific_date = $this->data['date'];
 		}
-		$person = $this->data['person'];
+		$person = (int)($this->data['person'] ?? 0);
 		if (isset($this->data['from_time'])) {
 			$slot_time = $this->data['from_time'];
 		}
@@ -388,6 +410,17 @@ class EatcardReservation
         $getDayFromUser = date('l', strtotime($specific_date));
         $onSlotAvailableAllMealID = [];
 
+        $check_all_reservation = StoreReservation::query()
+            ->with('tables.table.diningArea', 'meal')
+            ->where('store_id', $this->store->id)
+            ->where('res_date', $specific_date)
+            ->whereNotIn('status', ['declined', 'cancelled'])
+            ->where(function ($q1) {
+                $q1->whereIn('local_payment_status', ['paid', '', 'pending'])->orWhere('total_price', null);
+            })
+            ->where('is_seated', '!=', 2)
+            ->get();
+
 		foreach ($availableSlots as $slot) {
 			if ($slot['from_time'] == $slot_time) {
                 $onSlotAvailableAllMealID =  checkSlotMealAvailable($store_slug, $specific_date, $person, $slot, $slot_time, $slot_model);
@@ -402,6 +435,7 @@ class EatcardReservation
 		}else {
 			$activeMeals = getActiveMeals($slotAvailableMeals, $specific_date, $store_id, $slot_time, $person);
 		}
+
 		$slotAvailableMeals += $activeMeals;
 		//Fetch the details of meal based on meals id
 		$slot_active_meals = Meal::query()->where('status', 1)->whereIn('id', $slotAvailableMeals)->get();
@@ -440,15 +474,20 @@ class EatcardReservation
 		}
 		$final_available_meals = [];
 		foreach ($slot_active_meals as $meal) {
-			$checkDisable = getDisable($store_id, $specific_date, $person, $meal, $store, $slot_time, $disable);
+			$checkDisable = getDisable($store_id, $specific_date, $person, $meal, $store, $slot_time, $disable,$check_all_reservation);
 			if ($checkDisable == false) {
 				$final_available_meals[] = $meal;
 			}
 			$disable = $checkDisable;
 		}
 		foreach ($final_available_meals as $meal) {
-			$disableStatus = remainingSeatCheckDisable($store_id, $specific_date, $meal, $person, $store, $disable, $this->data);
-			$disable = $disableStatus['disable'];
+		    $currentSlot = collect($availableSlots)->first();
+			$disableStatus = remainingSeatCheckDisable($store_id, $specific_date, $meal, $person, $store, $disable, $this->data,$currentSlot,$check_all_reservation);
+            if(isset($disableStatus['slot_disable'])){
+                $disable = true;
+            }else{
+                $disable = $disableStatus['disable'];
+            }
 		}
 		$reservationDetails['meals'] = $final_available_meals;
 		$reservationDetails['disable'] = $disable;

@@ -894,7 +894,7 @@ if (!function_exists('getActiveMeals')) {
                 ->where('is_day_meal', 0)
                 ->where('store_date', $specific_date);
 
-            if (!is_null($slot_time)) {
+            if (!empty($slot_time)) {
                 $isSlotModifiedAvailable = $isSlotModifiedAvailable->where('from_time', $slot_time)->get()->toArray();
             } else {
                 $isSlotModifiedAvailable = $isSlotModifiedAvailable->get()->toArray();
@@ -1163,22 +1163,21 @@ if (!function_exists('getDisable')) {
      * @return string
      * @discription Return disable for meal function show or hide
      */
-    function getDisable($store_id, $specific_date, $person, $slot_active_meals, $store, $slot_time, $disable)
+    function getDisable($store_id, $specific_date, $person, $slot_active_meals, $store, $slot_time, $disable,$check_all_reservation)
     {
-
+        $disable = false;
         //Reservation check here for limit of person based on available reservation
-        $res_id = 0;
-        $check_all_reservation = StoreReservation::query()
-            ->with('tables.table.diningArea', 'meal')
-            ->where('store_id', $store_id)
-            ->where('res_date', $specific_date)
-            ->where('id', '!=', $res_id)
-            ->whereNotIn('status', ['declined', 'cancelled'])
-            ->where(function ($q1) {
-                $q1->whereIn('local_payment_status', ['paid', '', 'pending'])->orWhere('total_price', null);
-            })
-            ->where('is_seated', '!=', 2)
-            ->get();
+//        $res_id = 0;
+//        $check_all_reservation = StoreReservation::query()
+//            ->with('tables.table.diningArea', 'meal')
+//            ->where('store_id', $store_id)
+//            ->where('res_date', $specific_date)
+//            ->whereNotIn('status', ['declined', 'cancelled'])
+//            ->where(function ($q1) {
+//                $q1->whereIn('local_payment_status', ['paid', '', 'pending'])->orWhere('total_price', null);
+//            })
+//            ->where('is_seated', '!=', 2)
+//            ->get();
 
         //check dining area status active or not
         $sections = DiningArea::query()
@@ -1233,6 +1232,7 @@ if (!function_exists('getDisable')) {
                 }
 
                 $available_table_list = array_diff($tables_id, $table_assign);
+//                dd($available_table_list);
                 Log::info("Reservation : Available Table List - " . json_encode($available_table_list));
                 if (!$available_table_list) {
                     $disable = true;
@@ -1541,8 +1541,9 @@ if (!function_exists('reservedTimeSlot')) {
      * @return array
      * @Description Fetch reserved time slot
      */
-    function remainingSeatCheckDisable($store_id, $specific_date, $meal, $person, $store, $disable, $data)
+    function remainingSeatCheckDisable($store_id, $specific_date, $meal, $person, $store, $disable, $data, $slot, $check_all_reservation)
     {
+        $disable = false;
         $time_slot = [];
         $sections = DiningArea::query()
             ->where('store_id', $store_id)
@@ -1554,7 +1555,7 @@ if (!function_exists('reservedTimeSlot')) {
         $sections = $sections->get();
 
         if (empty($sections->count())) {
-            $disable = true;
+            return ['disable' => true];
         }
 
         if ($store->is_table_mgt_enabled == 1 && $sections->count() > 0) {
@@ -1562,7 +1563,7 @@ if (!function_exists('reservedTimeSlot')) {
             foreach ($sections as $section) {
                 foreach ($section->tables as $table) {
                     if ($table->online_status == 1 && $table->status == 1) {
-                        $total_seat = $total_seat + $table->no_of_seats;
+                        $total_seat += $table->no_of_seats;
                     }
                 }
             }
@@ -1571,21 +1572,21 @@ if (!function_exists('reservedTimeSlot')) {
             $with_table_person = 0;
             $res_id = 0;
             //Check the all reservation which local payment status paid, pending or null
-            $check_all_reservation = StoreReservation::query()
-                ->with('tables.table.diningArea', 'meal')
-                ->where('store_id', $store_id)
-                ->where('res_date', $specific_date)
-                ->where('id', '!=', $res_id)
-                ->whereNotIn('status', ['declined', 'cancelled'])
-                ->where(function ($q1) {
-                    $q1->whereIn('local_payment_status', ['paid', '', 'pending'])->orWhere('total_price', null);
-                })
-                ->where('is_seated', '!=', 2)
-                ->get();
+//            $check_all_reservation = StoreReservation::query()
+//                ->with('tables.table.diningArea', 'meal')
+//                ->where('store_id', $store_id)
+//                ->where('res_date', $specific_date)
+//                ->where('id', '!=', $res_id)
+//                ->whereNotIn('status', ['declined', 'cancelled'])
+//                ->where(function ($q1) {
+//                    $q1->whereIn('local_payment_status', ['paid', '', 'pending'])->orWhere('total_price', null);
+//                })
+//                ->where('is_seated', '!=', 2)
+//                ->get();
 
             foreach ($check_all_reservation as $reservation) {
-                $item = $reservation;
-                $another_meeting = getAnotherMeeting($reservation, $meal, $item);
+                Log::info("------Test 1 : ", [$slot]);
+                $another_meeting = getAnotherMeeting($reservation, $meal, $slot);
                 if ($another_meeting) {
                     if ($reservation->tables && count($reservation->tables) > 0) {
                         foreach ($reservation->tables as $table) {
@@ -1597,42 +1598,65 @@ if (!function_exists('reservedTimeSlot')) {
                         $without_table_person = $without_table_person + $reservation->person;
                     }
                 }
+            }
                 $remain_seats = $total_seat - $with_table_person - $without_table_person;
 
-                if ($remain_seats >= $person) {
-                    foreach ($sections as $section) {
-                        $section_wise_seat = 0;
-                        $reservation_seat = 0;
-                        foreach ($section->tables as $table) {
-                            if ($table->online_status == 1 && $table->status == 1) {
-                                $section_wise_seat = $section_wise_seat + $table->no_of_seats;
-                            }
+            if ($remain_seats < $person) {
+                return ["slot_disable" => true];
+            }
+
+            if ($remain_seats >= $person) {
+                foreach ($sections as $section) {
+                    $section_wise_seat = 0;
+                    $reservation_seat = 0;
+                    foreach ($section->tables as $table) {
+                        if ($table->online_status == 1 && $table->status == 1) {
+                            $section_wise_seat = $section_wise_seat + $table->no_of_seats;
                         }
-                        foreach ($check_all_reservation as $reservation) {
-                            $item = $reservation;
-                            $another_meeting = getAnotherMeeting($reservation, $meal, $item);
-                            if ($another_meeting) {
-                                if ($reservation->tables && count($reservation->tables) > 0) {
-                                    foreach ($reservation->tables as $table) {
-                                        if ($table->table && $table->table->diningArea && $table->table->diningArea->id == $section->id && $table->table->diningArea->status == 1) {
-                                            $reservation_seat = $reservation_seat + $table->table->no_of_seats;
-                                        }
+                    }
+                    foreach ($check_all_reservation as $reservation) {
+                        Log::info("------Test 2 : ", [$slot]);
+                        $another_meeting = getAnotherMeeting($reservation, $meal, $slot);
+                        if ($another_meeting) {
+                            if ($reservation->tables && count($reservation->tables) > 0) {
+                                foreach ($reservation->tables as $table) {
+                                    if ($table->table && $table->table->diningArea && $table->table->diningArea->id == $section->id && $table->table->diningArea->status == 1) {
+                                        $reservation_seat = $reservation_seat + $table->table->no_of_seats;
                                     }
                                 }
                             }
                         }
-                        $remaining_seat = $section_wise_seat - $reservation_seat;
-                        if ($remaining_seat >= $person) {
-                            $disable = false;
-                            return ['disable' => $disable];
-                        }
                     }
-                } elseif ($remain_seats < $person) {
-                    $disable = true;
+                    $remaining_seat = $section_wise_seat - $reservation_seat;
+                    if ($remaining_seat < $person) {
+                        return ["slot_disable" => true];
+                    }
                 }
             }
         }
         return ['disable' => $disable];
+    }
+}
+
+function checkSlotAvailability($start_time, $key, $picktimes) {
+    $start_picktime = Carbon::parse($start_time);
+    $diff_picktime = 120;
+    if(isset($picktimes[$key + 1])) {
+        $end_picktime = Carbon::parse($picktimes[$key + 1]->from_time);
+        $diff_picktime = ($start_picktime->diffInMinutes($end_picktime) <= 120) ? $start_picktime->diffInMinutes($end_picktime) : 120;
+    } else {
+        if(!isset($picktimes[$key + 1])) {
+            if(isset($picktimes[$key - 1])) {
+                $end_picktime = Carbon::parse($picktimes[$key - 1]->from_time);
+                $diff_picktime = ($start_picktime->diffInMinutes($end_picktime) <= 120) ? $start_picktime->diffInMinutes($end_picktime) : 120;
+            }
+        }
+    }
+    $end_time = Carbon::parse($start_picktime)->addMinutes($diff_picktime)->format('H:i');
+    if(strtotime($start_picktime) > strtotime($end_time)) {
+        return '24:00';
+    } else {
+        return $end_time;
     }
 }
 
@@ -1646,6 +1670,7 @@ if (!function_exists('getAnotherMeeting')) {
      */
     function getAnotherMeeting($reservation, $meal, $item)
     {
+
         $time_limit = '';
         if (!$reservation->end_time) {
             $time_limit = ($reservation->meal && $reservation->meal->time_limit) ? $reservation->meal->time_limit : 120;
@@ -1653,14 +1678,14 @@ if (!function_exists('getAnotherMeeting')) {
                 ->addMinutes($time_limit)
                 ->format('H:i');
         }
-        if (!isset($time_limit)) {
+        if (!empty($time_limit)) {
             $time_limit = ($meal->time_limit) ? $meal->time_limit : 120;
         }
-        $end_time = Carbon::parse($item->from_time)->addMinutes($time_limit)->format('H:i');
+        $end_time = Carbon::parse($item['from_time'])->addMinutes($time_limit)->format('H:i');
 
-        $another_meeting = (strtotime($item->from_time) > strtotime($reservation->from_time) && strtotime($item->from_time) < strtotime($reservation->end_time)) ||
-            (strtotime($reservation->from_time) > strtotime($item->from_time) && strtotime($reservation->from_time) < strtotime($end_time)) ||
-            (strtotime($item->from_time) == strtotime($reservation->from_time));
+        $another_meeting = (strtotime($item['from_time']) > strtotime($reservation['from_time']) && strtotime($item['from_time']) < strtotime($reservation->end_time)) ||
+            (strtotime($reservation['from_time']) > strtotime($item['from_time']) && strtotime($reservation['from_time']) < strtotime($end_time)) ||
+            (strtotime($item['from_time']) == strtotime($reservation['from_time']));
 
         return $another_meeting;
     }
