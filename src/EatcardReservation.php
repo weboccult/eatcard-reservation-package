@@ -316,7 +316,6 @@ class EatcardReservation
 		//Check Slot available for meal or not
         $availableSlots = [];
         $notShowSlots = [];
-        $disable = false;
 
         $check_all_reservation = StoreReservation::query()
             ->with('tables.table.diningArea', 'meal')
@@ -330,7 +329,7 @@ class EatcardReservation
             ->get();
 
         foreach($this->activeSlots as $slotKey => $eachSlot){
-            if ($eachSlot['max_entries'] == 'unlimited' || $eachSlot['max_entries'] >= $person ) {
+            if ($eachSlot['max_entries'] == 'Unlimited' || $eachSlot['max_entries'] >= $person ) {
 
                 $onSlotAvailableAllMealID =  checkSlotMealAvailable($this->store->store_slug, $specific_date, $person, $eachSlot, $eachSlot['from_time'], $eachSlot['data_model']);
 
@@ -346,6 +345,7 @@ class EatcardReservation
                 if (!$checkSlotTableAvailable) {
                     $disableStatus = remainingSeatCheckDisable($this->store->id, $specific_date, $slot_active_meals, $person, $this->store, $disable, $this->data,$eachSlot,$check_all_reservation);
                 } else {
+                    Log::info("Slot disable true from remaining seat check disable : " , [$eachSlot]);
                     $disableStatus['slot_disable'] = true;
                 }
 
@@ -364,10 +364,10 @@ class EatcardReservation
 
             }else{
                 $notShowSlots[] = $eachSlot;
-                Log::info("Not Available slots : " . json_encode($notShowSlots));
+                Log::info("Not Available slots : " , [$notShowSlots]);
             }
         }
-        Log::info("Available slots : " . json_encode($availableSlots));
+        Log::info("Available slots : " , [$availableSlots]);
         return [
             "active_slots"     => $availableSlots,
             "booking_off_time" => $this->store->booking_off_time,
@@ -532,7 +532,8 @@ class EatcardReservation
             }
 
             $assign_person = getTotalPersonFromReservations ($check_all_reservation,$meal,$slot_time);
-            if ($getAllSlotOfCurrentMeal['max_entries'] != 'unlimited' && (int)$getAllSlotOfCurrentMeal['max_entries'] - $assign_person < $person) {
+            if ($getAllSlotOfCurrentMeal['max_entries'] != 'Unlimited' && (int)$getAllSlotOfCurrentMeal['max_entries'] - $assign_person < $person) {
+                Log::info("check max entry getTotalPersonFromReservations" , [$getAllSlotOfCurrentMeal['max_entries']]);
                 $meal['is_disable_meal'] = true;
                 continue;
             }
@@ -542,12 +543,15 @@ class EatcardReservation
                 $currentSlot = collect($availableSlots)->first();
                 $disableStatus = remainingSeatCheckDisable($store_id, $specific_date, $meal, $person, $store, $disable, $this->data,$currentSlot,$check_all_reservation);
                 if(isset($disableStatus['slot_disable'])){
+                    Log::info("Slot disable set from remainingSeatCheckDisable " , [$disableStatus['slot_disable']]);
                     $meal['is_disable_meal'] = true;
 
                 }else{
+                    Log::info("Else set from remainingSeatCheckDisable " , [$disableStatus['disable']]);
                     $meal['is_disable_meal'] = $disableStatus['disable'];
                 }
 			} else {
+			    Log::info( "main else ford disable : " , [$meal['is_disable_meal']]);
                 $meal['is_disable_meal'] = true;
             }
 			$disable = $checkDisable;
