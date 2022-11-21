@@ -638,6 +638,7 @@ if (!function_exists('createNewReservation')) {
             }
             $new_reservation_data['id'] = $storeNewReservation->id;
             $new_reservation_data['payment'] = true;
+            $new_reservation_data['payment_method_type'] = $data['payment_method_type'];
             $new_reservation_data['payment_url'] = isset($paymentUrl) ? $paymentUrl : $payment['payment_url'];
             return $new_reservation_data;
         }
