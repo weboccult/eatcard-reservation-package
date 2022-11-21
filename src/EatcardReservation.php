@@ -583,6 +583,13 @@ class EatcardReservation
 	{
 		$store = getStoreBySlug($this->data['store_slug']);
 		$meal = Meal::query()->findOrFail($this->data['meal_type']);
+        if (empty($this->data['country_code'])) {
+            return [
+                'code'   => '400',
+                'status' => 'error',
+                'error'  => 'error_country_code'
+            ];
+        }
 		/*If ayce reservation was available then create ayce reservation other wise create cart reservation*/
 		$this->data['dinein_price_id'] = 0;
 		$this->data['reservation_type'] = 'cart';
