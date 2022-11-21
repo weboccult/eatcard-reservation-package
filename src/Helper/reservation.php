@@ -1193,6 +1193,7 @@ if (!function_exists('getDisable')) {
                         $q1->where('store_id', $store->id)
                             ->where('status', 1);
                     })->where('status', 1)->where('online_status', 1);
+
                 if (!empty($section_id)) {
                     $check_table = $check_table->where('dining_area_id', $section_id);
                 }
@@ -1203,6 +1204,7 @@ if (!function_exists('getDisable')) {
                 //Already assign table list
                 $table_assign = [];
                 $time_limit_of_reservation = [];
+
                 foreach ($check_all_reservation as $reservation) {
 
                     //If not set time limit of meal then auto set 120 minutes for it.
@@ -1236,6 +1238,7 @@ if (!function_exists('getDisable')) {
                     continue;
 
                 }
+
                 $table_availability = false;
                 foreach ($available_table_list as $empty_table) {
                     $empty_table_data = $tables->where('id', $empty_table)->first();
@@ -1244,6 +1247,7 @@ if (!function_exists('getDisable')) {
                     if (in_array($person, $person_seat_range)) {
                         $table_availability = true;
                         $disable = false;
+                        Log::info("Table Availability Found there 0 ",[$person,$empty_table_data->no_of_min_seats,$empty_table_data->no_of_seats,$person_seat_range]);
                         break 2;
                     } else if (!$table_availability) {
                         Log::info("Table Availability not there ");
@@ -1269,7 +1273,8 @@ if (!function_exists('getDisable')) {
                     continue;
                 }
 
-                $section_str = $section;
+                foreach ($sections as $section_str) {
+                    $section_str = $section;
                     $store_table = [];
                     $total = 0;
                     foreach ($section_str->tables as $table) {
@@ -1284,6 +1289,7 @@ if (!function_exists('getDisable')) {
                         if ($match && (array_sum($match) == $person || array_sum($match) == $person + 1)) {
                             if ((collect($match)->count() == 1) || ($store->allow_auto_group == 1 && collect($match)->count() > 1)) {
                                 $disable = false;
+                                Log::info("Table Availability Found here 1 ", [$match,allow_auto_group]);
                                 break;
                             }
                         } else {
@@ -1291,6 +1297,7 @@ if (!function_exists('getDisable')) {
                             if ($match && array_sum($match) == $person + 1) {
                                 if ((collect($match)->count() == 1) || ($store->allow_auto_group == 1 && collect($match)->count() > 1)) {
                                     $disable = false;
+                                    Log::info("Table Availability Found here 2(match +1) ", [$match,$store->allow_auto_group]);
                                     break;
                                 }
                             }
@@ -1298,7 +1305,8 @@ if (!function_exists('getDisable')) {
                     }//Compare person availability check
                 }//Second loop for section end
             }//If condition smart reservation end
-        Log::info("Reservation : Available Table List | disable status - " , [$available_table_list,$disable]);
+        }//Loop for section end
+        Log::info("Reservation : Available Table List | disable status - ", [$available_table_list, $disable]);
         return $disable;
     }
 }
