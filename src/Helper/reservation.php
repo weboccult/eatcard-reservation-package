@@ -1243,6 +1243,8 @@ if (!function_exists('getDisable')) {
 
                     if (in_array($person, $person_seat_range)) {
                         $table_availability = true;
+                        $disable = false;
+                        break 2;
                     } else if (!$table_availability) {
                         Log::info("Table Availability not there ");
                         $disable = true;
@@ -1296,7 +1298,7 @@ if (!function_exists('getDisable')) {
                     }//Compare person availability check
                 }//Second loop for section end
             }//If condition smart reservation end
-        Log::info("Reservation : Available Table List - " , [$available_table_list]);
+        Log::info("Reservation : Available Table List | disable status - " , [$available_table_list,$disable]);
         return $disable;
     }
 }
