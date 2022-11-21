@@ -1289,7 +1289,7 @@ if (!function_exists('getDisable')) {
                         if ($match && (array_sum($match) == $person || array_sum($match) == $person + 1)) {
                             if ((collect($match)->count() == 1) || ($store->allow_auto_group == 1 && collect($match)->count() > 1)) {
                                 $disable = false;
-                                Log::info("Table Availability Found here 1 ", [$match,allow_auto_group]);
+                                Log::info("Table Availability Found here 1 ", [$match,$store->allow_auto_group]);
                                 break;
                             }
                         } else {
