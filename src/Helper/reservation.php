@@ -1274,7 +1274,6 @@ if (!function_exists('getDisable')) {
                 }
 
                 foreach ($sections as $section_str) {
-                    $section_str = $section;
                     $store_table = [];
                     $total = 0;
                     foreach ($section_str->tables as $table) {
