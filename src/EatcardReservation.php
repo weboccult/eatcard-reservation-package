@@ -836,7 +836,7 @@ class EatcardReservation
 			$this->data['payment_method_type'] = '';
 			$this->data['method'] = '';
 		}
-		$this->data['created_from'] = 'reservation_2';
+		$this->data['created_from'] = 'reservation';
 		if (!$meal->price && $meal->payment_type != 1 && $meal->payment_type != 3) {
 
 		}
