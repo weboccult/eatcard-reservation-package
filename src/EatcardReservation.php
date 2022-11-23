@@ -274,9 +274,9 @@ class EatcardReservation
         $pastTimeSlots = [];
 		$featureTimeSlots = [];
 		$currentTime = Carbon::now()->format('G:i');
-		if ($specific_date == Carbon::now()->format('Y-m-d')) {
+//		if ($specific_date == Carbon::now()->format('Y-m-d')) {
 			foreach ($this->activeSlots as $activeSloteKey => $activeCurrentSlot) {
-				if (strtotime($activeCurrentSlot['from_time']) < strtotime($currentTime) && $this->activeSlots[$activeSloteKey]['is_slot_disabled'] == 0) {
+				if (strtotime($activeCurrentSlot['from_time']) < strtotime($currentTime) /*&& $this->activeSlots[$activeSloteKey]['is_slot_disabled'] == 0*/) {
 //					$this->activeSlots[$activeSloteKey]['is_slot_disabled'] = 1;
                     $pastTimeSlots[] = $activeCurrentSlot;
 				}
@@ -284,7 +284,7 @@ class EatcardReservation
                     $featureTimeSlots[] = $activeCurrentSlot;
                 }
 			}
-		}
+//		}
         $this->activeSlots = $featureTimeSlots;
 		foreach ($disableByDay as $each) {
 			if ($each == $specific_date) {
