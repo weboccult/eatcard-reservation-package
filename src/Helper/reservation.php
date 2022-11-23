@@ -1165,6 +1165,7 @@ if (!function_exists('getDisable')) {
     function getDisable($store_id, $specific_date, $person, $slot_active_meals, $store, $slot_time, $disable,$check_all_reservation)
     {
         $disable = false;
+        $available_table_list = [];
         //Reservation check here for limit of person based on available reservation
 //        $res_id = 0;
 //        $check_all_reservation = StoreReservation::query()
