@@ -1237,7 +1237,6 @@ if (!function_exists('getDisable')) {
                     $disable = true;
                     Log::info("Available table not there");
                     continue;
-
                 }
 
                 $table_availability = false;
@@ -1255,55 +1254,76 @@ if (!function_exists('getDisable')) {
                         $disable = true;
                     }
                 }
+                $data['store_id'] = $store->id;
+                $availableTables = getAvailableTables($data, $table_assign, $section_id);
 
-                $get_section = DiningArea::query()
-                    ->with(['tables' => function ($q1) use ($available_table_list, $person) {
-                        $q1->whereIn('id', $available_table_list)
-                            ->where('online_status', 1)
-                            ->where('status', 1)
-                            ->where('no_of_seats', '<=', $person);
-                    }
-                    ])->where('store_id', $store->id)->where('status', 1);
-                if ($section_id != null) {
-                    $get_section = $get_section->where('id', $section_id);
-                }
-                $sections = $get_section->get();
-                if (empty($sections->count())) {
-                    Log::info("Section not available : ");
-                    $disable = true;
-                    continue;
+                /*<--- min-max person capacity check--->*/
+                $isExist = $availableTables
+                    ->where('no_of_min_seats', '<=', $person)
+                    ->Where('no_of_seats', '>=', $person)
+                    ->first();
+
+                if (!$isExist) {
+                    /*<--- min-max person capacity check--->*/
+                    $isExist = $availableTables
+                        ->where('no_of_min_seats', '<=', $person)
+                        ->Where('no_of_seats', '>=', ($person + 1))
+                        ->first();
                 }
 
-                foreach ($sections as $section_str) {
-                    $store_table = [];
-                    $total = 0;
-                    foreach ($section_str->tables as $table) {
-                        $store_table[] = [$table->no_of_seats];
-                        $total += $table->no_of_seats;
+                /*check if the auto group/merge table is allowed or not and no single table available*/
+                if ($store->allow_auto_group && !$isExist) {
+                    Log::info('Allow auto group is on');
+
+                    $get_section = DiningArea::query()
+                        ->with(['tables' => function ($q1) use ($available_table_list, $person) {
+                            $q1->whereIn('id', $available_table_list)
+                                ->where('online_status', 1)
+                                ->where('status', 1)
+                                ->where('no_of_seats', '<=', $person);
+                        }
+                        ])->where('store_id', $store->id)->where('status', 1);
+                    if ($section_id != null) {
+                        $get_section = $get_section->where('id', $section_id);
                     }
-                    if ($total >= $person) {
-                        usort($store_table, function ($a, $b) {
-                            return $a <=> $b;
-                        });
-                        $match = bestsum($store_table, $person);
-                        if ($match && (array_sum($match) == $person || array_sum($match) == $person + 1)) {
-                            if ((collect($match)->count() == 1) || ($store->allow_auto_group == 1 && collect($match)->count() > 1)) {
-                                $disable = false;
-                                Log::info("Table Availability Found here 1 ", [$match,$store->allow_auto_group]);
-                                break;
-                            }
-                        } else {
-                            $match = bestsum($store_table, $person + 1);
-                            if ($match && array_sum($match) == $person + 1) {
+                    $sections = $get_section->get();
+                    if (empty($sections->count())) {
+                        Log::info("Section not available : ");
+                        $disable = true;
+                        continue;
+                    }
+
+                    foreach ($sections as $section_str) {
+                        $store_table = [];
+                        $total = 0;
+                        foreach ($section_str->tables as $table) {
+                            $store_table[] = [$table->no_of_seats];
+                            $total += $table->no_of_seats;
+                        }
+                        if ($total >= $person) {
+                            usort($store_table, function ($a, $b) {
+                                return $a <=> $b;
+                            });
+                            $match = bestsum($store_table, $person);
+                            if ($match && (array_sum($match) == $person || array_sum($match) == $person + 1)) {
                                 if ((collect($match)->count() == 1) || ($store->allow_auto_group == 1 && collect($match)->count() > 1)) {
                                     $disable = false;
-                                    Log::info("Table Availability Found here 2(match +1) ", [$match,$store->allow_auto_group]);
+                                    Log::info("Table Availability Found here 1 ", [$match, $store->allow_auto_group]);
                                     break;
                                 }
+                            } else {
+                                $match = bestsum($store_table, $person + 1);
+                                if ($match && array_sum($match) == $person + 1) {
+                                    if ((collect($match)->count() == 1) || ($store->allow_auto_group == 1 && collect($match)->count() > 1)) {
+                                        $disable = false;
+                                        Log::info("Table Availability Found here 2(match +1) ", [$match, $store->allow_auto_group]);
+                                        break;
+                                    }
+                                }
                             }
-                        }
-                    }//Compare person availability check
-                }//Second loop for section end
+                        }//Compare person availability check
+                    }//Second loop for section end
+                }
             }//If condition smart reservation end
         }//Loop for section end
         Log::info("Reservation : Available Table List | disable status - ", [$available_table_list, $disable]);
