@@ -262,9 +262,27 @@ class EatcardReservation
 			$this->activeSlots = specificDateSlots($this->store, $specific_date, $slot_time, $slot_model);
 		}
 
+		$weekDayCheck = StoreWeekDay::query()
+            ->where('store_id', $this->store->id)
+            ->where('is_active', 1)
+            ->where('name', $getDayFromUser)
+            ->where('is_week_day_meal', 0)
+            ->count();
+
 		if (empty($this->activeSlots) && $dayCheck) {
-            $this->activeSlots = specificDaySlots($this->store, $getDayFromUser, $slot_time, $specific_date);
-            $this->activeSlots += mealSlots($this->store, $slot_time, $specific_date);
+		    if(!empty($weekDayCheck)){
+                $this->activeSlots = mealSlots($this->store, $slot_time, $specific_date);
+                $this->activeSlots = array_merge($this->activeSlots,specificDaySlots($this->store, $getDayFromUser, $slot_time, $specific_date));
+            }else{
+                $this->activeSlots = array_merge($this->activeSlots,mealSlots($this->store, $slot_time, $specific_date));
+                $this->activeSlots = array_merge($this->activeSlots,generalSlots($this->store, $slot_time, $specific_date));
+            }
+//            $this->activeSlots = specificDaySlots($this->store, $getDayFromUser, $slot_time, $specific_date);
+//            Log::info("Day-wise : Specific day slot : ", [$this->activeSlots]);
+//            $this->activeSlots = array_merge($this->activeSlots,mealSlots($this->store, $slot_time, $specific_date));
+//            Log::info("Day-wise : Meal Slot : ", [$this->activeSlots]);
+//            $this->activeSlots = array_merge($this->activeSlots,generalSlots($this->store, $slot_time, $specific_date));
+//            Log::info("Day-wise : General Slot : ", [$this->activeSlots]);
             $this->activeSlots = superUnique(collect($this->activeSlots), 'from_time');
 		}
 		if(empty($this->activeSlots)) {
