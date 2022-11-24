@@ -1089,7 +1089,7 @@ function checkSlotMealAvailable($store_slug, $specific_date, $person, $slot, $sl
                 $storeIsMeal[] = $meal->id;
             }
         }
-
+            $dateDayMealSlots = [];
             foreach ($storeWeekMeal as $weekMeal) {
                 $dateDayMealSlots = StoreSlot::query()
                     ->where('store_id', $store_id)
@@ -1154,7 +1154,7 @@ function checkSlotMealAvailable($store_slug, $specific_date, $person, $slot, $sl
                     $storeIsMeal[] = $meal->id;
                 }
             }
-
+            $dateDayMealSlots = [];
             foreach ($storeWeekMeal as $weekMeal) {
                 $dateDayMealSlots = StoreSlot::query()
                     ->where('store_id', $store_id)
