@@ -273,9 +273,11 @@ class EatcardReservation
 		    if(!empty($weekDayCheck)){
                 $this->activeSlots = mealSlots($this->store, $slot_time, $specific_date);
                 $this->activeSlots = array_merge($this->activeSlots,specificDaySlots($this->store, $getDayFromUser, $slot_time, $specific_date));
+                $this->activeSlots = superUnique(collect($this->activeSlots), 'from_time');
             }else{
                 $this->activeSlots = array_merge($this->activeSlots,mealSlots($this->store, $slot_time, $specific_date));
                 $this->activeSlots = array_merge($this->activeSlots,generalSlots($this->store, $slot_time, $specific_date));
+                $this->activeSlots = superUnique(collect($this->activeSlots), 'from_time');
             }
 //            $this->activeSlots = specificDaySlots($this->store, $getDayFromUser, $slot_time, $specific_date);
 //            Log::info("Day-wise : Specific day slot : ", [$this->activeSlots]);
@@ -283,7 +285,7 @@ class EatcardReservation
 //            Log::info("Day-wise : Meal Slot : ", [$this->activeSlots]);
 //            $this->activeSlots = array_merge($this->activeSlots,generalSlots($this->store, $slot_time, $specific_date));
 //            Log::info("Day-wise : General Slot : ", [$this->activeSlots]);
-            $this->activeSlots = superUnique(collect($this->activeSlots), 'from_time');
+//            $this->activeSlots = superUnique(collect($this->activeSlots), 'from_time');
 		}
 		if(empty($this->activeSlots)) {
 			$this->activeSlots = generalSlots($this->store, $slot_time, $specific_date);
