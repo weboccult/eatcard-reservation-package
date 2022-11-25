@@ -566,7 +566,7 @@ class EatcardReservation
             }
 
             $assign_person = getTotalPersonFromReservations ($check_all_reservation,$meal,$slot_time);
-            if ($getAllSlotOfCurrentMeal['max_entries'] != 'Unlimited' && (int)$getAllSlotOfCurrentMeal['max_entries'] - $assign_person < $person) {
+            if (isset($getAllSlotOfCurrentMeal['max_entries']) && ($getAllSlotOfCurrentMeal['max_entries'] != 'Unlimited') && ((int)$getAllSlotOfCurrentMeal['max_entries'] - $assign_person < $person)) {
                 Log::info("check max entry getTotalPersonFromReservations" , [$getAllSlotOfCurrentMeal['max_entries']]);
                 $meal['is_disable_meal'] = true;
                 continue;

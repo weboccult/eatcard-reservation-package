@@ -1134,8 +1134,8 @@ function checkSlotMealAvailable($store_slug, $specific_date, $person, $slot, $sl
             $onSlotAvailableAllMealID = collect($daySlot)->pluck('meal_id')->toArray();
 
             //For Meal + Specific Day Remove Specific Day meal
-            $uniqueAvailbaleMealID = array_values(array_diff($onSlotAvailableAllMealID,$storeWeekMeal));
-            $onSlotAvailableAllMealID = $uniqueAvailbaleMealID;
+            $uniqueAvailableMealID = array_values(array_diff($onSlotAvailableAllMealID,$storeWeekMeal));
+            $onSlotAvailableAllMealID = $uniqueAvailableMealID;
 
             if(empty($onSlotAvailableAllMealID)){
                 $onSlotAvailableAllMealID = collect($dateDayMealSlots)->pluck('meal_id')->toArray();
@@ -1198,8 +1198,12 @@ function checkSlotMealAvailable($store_slug, $specific_date, $person, $slot, $sl
             $onSlotAvailableAllMealID = collect($generalSlot)->pluck('meal_id')->toArray();
 
             //For Meal + General slot Remove General meal
-            $uniqueAvailbaleMealID = array_values(array_diff($onSlotAvailableAllMealID,$storeWeekMeal));
-            $onSlotAvailableAllMealID = $uniqueAvailbaleMealID;
+            if(empty($storeWeekMeal)){
+                $uniqueAvailableMealID = $storeWeekMeal;
+            }else{
+                $uniqueAvailableMealID = array_unique(array_merge($onSlotAvailableAllMealID,$storeWeekMeal));
+                $onSlotAvailableAllMealID = $uniqueAvailableMealID;
+            }
 
             if(empty($onSlotAvailableAllMealID)){
                 $onSlotAvailableAllMealID = collect($dateDayMealSlots)->pluck('meal_id')->toArray();
