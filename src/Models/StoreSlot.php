@@ -4,6 +4,7 @@ namespace Weboccult\EatcardReservation\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Carbon\Carbon;
 
 class StoreSlot extends Model
 {
@@ -19,7 +20,12 @@ class StoreSlot extends Model
 		'store_weekdays_id',
 		'meal_group_id',
 	];
-    protected $appends = ['data_model'];
+    protected $appends = ['data_model','from_time'];
+
+    public function getFromTimeAttribute()
+    {
+        return Carbon::parse($this->getRawOriginal('from_time'))->format('H:i');
+    }
 
     public function getDataModelAttribute()
     {
