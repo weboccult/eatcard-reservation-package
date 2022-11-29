@@ -123,12 +123,27 @@ if (!function_exists('specificDateSlots')) {
             } else {
                 $dateDayMealSlots = $dateDayMealSlots->orderBy('from_time', 'ASC')->get()
                     ->toArray();
-
             }
+            $generalSlot = StoreSlot::query()
+                ->where('store_id', $store->id)
+                ->doesntHave('store_weekday')
+                ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id');
+
+            if (!empty($slot_time)) {
+                $generalSlot = $generalSlot->where('from_time', $slot_time)->get()->toArray();
+            } else {
+                $generalSlot = $generalSlot->orderBy('from_time', 'ASC')->get()->toArray();
+            }
+
             if ($dateDayMealSlots == null) {
                 $dateDayMealSlots = [];
             } else {
-                $dateMealSlotsData = superUnique($dateDayMealSlots, 'from_time');
+                if(!empty($dateMealSlotsData)){
+                    $dateMealSlotsData = superUnique($dateDayMealSlots, 'from_time');
+                }else{
+                    $generalSlot = array_merge($generalSlot,$dateDayMealSlots);
+                    $dateMealSlotsData = superUnique($generalSlot, 'from_time');
+                }
             }
         }
         $activeSlots = $dateMealSlotsData;
@@ -1253,49 +1268,75 @@ function checkSlotMealAvailable($store_slug, $specific_date, $person, $slot, $sl
 
     /***** -------------------------------------------------------------------------- *****/
     //If Store create specific date on meal then that meal not showen in other Slots
-    $specificDateOnMealStore = [];
-    $dateMealSlotsData = StoreSlotModified::query()
-        ->where('store_id', $store_id)
+    $isSlotModifiedAvailableSpecific = StoreSlotModified::query()
+        ->where('store_id', $store->id)
         ->where('is_day_meal', 1)
         ->where('store_date', $specific_date)
-        ->where('is_available', 1)
-        ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id')
-        ->get();
-
+        ->where('is_available', 1);
     if (!is_null($slot_time)) {
-        $specificDateOnMeal = $dateMealSlotsData->where('from_time', $slot_time)->pluck('meal_id')->toArray();
-    } else {
-        $specificDateOnMeal = $dateMealSlotsData->pluck('meal_id')->toArray();
+        $isSlotModifiedAvailableSpecial = $isSlotModifiedAvailableSpecific->where('from_time', $slot_time)->count();
     }
-    if(isset($specificDateOnMeal)){
-        $specificDateOnMealStore = $specificDateOnMeal;
+    else {
+        $isSlotModifiedAvailableSpecial = $isSlotModifiedAvailableSpecific->count();
     }
-
-    $generalSlot = StoreSlot::query()
-        ->where('store_id', $store_id)
-        ->doesntHave('store_weekday')
-        ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id');
-
-    if (!empty($slot_time)) {
-        $generalSlot = $generalSlot->where('from_time', $slot_time)->get()->toArray();
-    } else {
-        $generalSlot = $generalSlot->orderBy('from_time', 'ASC')->get()->toArray();
+    foreach ($meals as $meal) {
+        if ($meal->is_meal_res) {
+            $isSlotModifiedAvailableSpecial = 1;
+        }
     }
+    if($isSlotModifiedAvailableSpecial > 0) {
+        $specificDateOnMealStore = [];
+        $dateMealSlotsData = StoreSlotModified::query()
+            ->where('store_id', $store_id)
+            ->where('is_day_meal', 1)
+            ->where('store_date', $specific_date)
+            ->where('is_available', 1)
+            ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id')
+            ->get();
 
-    $onSlotAvailableAllMealID = collect($generalSlot)->pluck('meal_id')->toArray();
-    Log::info("General slot + specific date slot ===> " , [$onSlotAvailableAllMealID,$generalSlot]);
+        if (!is_null($slot_time)) {
+            $specificDateOnMeal = $dateMealSlotsData->where('from_time', $slot_time)->pluck('meal_id')->toArray();
+        } else {
+            $specificDateOnMeal = $dateMealSlotsData->pluck('meal_id')->toArray();
+        }
+        if (isset($specificDateOnMeal)) {
+            $specificDateOnMealStore = $specificDateOnMeal;
+        }
 
-    if(empty($onSlotAvailableAllMealID)){
-        $onSlotAvailableAllMealID = $specificDateOnMealStore;
-    } else {
-        if(!empty($specificDateOnMealStore)){
-            $onSlotAvailableAllMealID = array_unique(array_merge($onSlotAvailableAllMealID, $specificDateOnMealStore));
+        //General Slots
+        $generalSlot = StoreSlot::query()
+            ->where('store_id', $store_id)
+            ->doesntHave('store_weekday')
+            ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id');
+
+        if (!empty($slot_time)) {
+            $generalSlot= $generalSlot->where('from_time', $slot_time)->get()->toArray();
+        } else {
+            $generalSlot = $generalSlot->orderBy('from_time', 'ASC')->get()->toArray();
+        }
+
+        $onSlotAvailableAllMealID = collect($generalSlot)->pluck('meal_id')->toArray();
+
+        //For Meal + General slot Remove General meal
+        if(empty($storeIsMeal)){
+            $uniqueAvailableMealID = $storeIsMeal;
         }else{
             $uniqueAvailableMealID = array_values(array_diff($onSlotAvailableAllMealID,$storeIsMeal));
             $onSlotAvailableAllMealID = $uniqueAvailableMealID;
         }
+
+        if (empty($onSlotAvailableAllMealID)) {
+            $onSlotAvailableAllMealID = $specificDateOnMealStore;
+        } else {
+            if (!empty($specificDateOnMealStore)) {
+                $onSlotAvailableAllMealID = array_unique(array_merge($onSlotAvailableAllMealID, $specificDateOnMealStore));
+            } else {
+                $uniqueAvailableMealID = array_values(array_diff($onSlotAvailableAllMealID, $storeIsMeal));
+                $onSlotAvailableAllMealID = $uniqueAvailableMealID;
+            }
+        }
+        /***** -------------------------------------------------------------------------- *****/
     }
-    /***** -------------------------------------------------------------------------- *****/
 
     return $onSlotAvailableAllMealID;
 }
