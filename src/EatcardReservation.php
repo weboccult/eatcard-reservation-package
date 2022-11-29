@@ -306,7 +306,10 @@ class EatcardReservation
                 }
 			}
 		}else{
-            $futureSlot = $this->activeSlots;
+            foreach ($this->activeSlots as $activeSloteKey => $activeCurrentSlot) {
+                $this->activeSlots[$activeSloteKey]['is_slot_disabled'] = 0;
+                $futureSlot = $this->activeSlots;
+            }
         }
 		if(!empty($featureTimeSlots)){
             $this->activeSlots = $featureTimeSlots;
@@ -372,6 +375,16 @@ class EatcardReservation
                 if (empty($slot_active_meals->count())) {
                     $disable = true;
                     continue;
+                }
+
+                //In slot person capacity check with all reservation and active meals
+                foreach ($slot_active_meals as $meal) {
+                    $assign_person = getTotalPersonFromReservations($check_all_reservation, $meal, $eachSlot['from_time']);
+                    if (isset($eachSlot['max_entries']) && ($eachSlot['max_entries'] != 'Unlimited') && ((int)$eachSlot['max_entries'] - $assign_person < $person)) {
+                        Log::info("check max entry Slot with all Reservation", [$eachSlot['max_entries']],(int)$eachSlot['max_entries'] - $assign_person < $person);
+                        $eachSlot['is_slot_disabled'] = 1;
+                        continue;
+                    }
                 }
 
                 $checkSlotTableAvailable = getDisable($this->store->id, $specific_date, $person, $slot_active_meals, $this->store, $eachSlot['from_time'], $disable,$check_all_reservation);
