@@ -1283,6 +1283,7 @@ function checkSlotMealAvailable($store_slug, $specific_date, $person, $slot, $sl
     }
 
     $onSlotAvailableAllMealID = collect($generalSlot)->pluck('meal_id')->toArray();
+    Log::info("General slot + specific date slot ===> " , [$onSlotAvailableAllMealID,$generalSlot]);
 
     if(empty($onSlotAvailableAllMealID)){
         $onSlotAvailableAllMealID = $specificDateOnMealStore;
