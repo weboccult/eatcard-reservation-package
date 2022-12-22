@@ -808,7 +808,7 @@ class EatcardReservation
 		}
 		//Fetch the data from user's details and other parameters
 		$this->data['store_id'] = $store->id;
-		$this->data['slot_id'] = $slot['id'];
+//		$this->data['slot_id'] = $slot['id'];
 		$this->data['from_time'] = Carbon::parse($slot['from_time'])->format('H:i');
 		$this->data['res_time'] = Carbon::parse($slot['from_time'])->format('H:i');
 		$this->data['user_id'] = isset($this->data['user_id']) ? $this->data['user_id'] : null;
