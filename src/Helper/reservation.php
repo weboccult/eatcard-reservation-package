@@ -130,6 +130,7 @@ if (!function_exists('specificDateSlots')) {
                 ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id');
 
             if (!empty($slot_time)) {
+                $slot_time = Carbon::parse($slot_time)->format('H:i');
                 $generalSlot = $generalSlot->where('from_time', $slot_time)->get()->toArray();
             } else {
                 $generalSlot = $generalSlot->orderBy('from_time', 'ASC')->get()->toArray();
@@ -179,6 +180,7 @@ if (!function_exists('specificDaySlots')) {
             ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id');
 
         if (!is_null($slot_time)) {
+            $slot_time = ltrim($slot_time, "0");
             $daySlot = $daySlot->where('from_time', $slot_time)->get()->toArray();
         } else {
             $daySlot = $daySlot->orderBy('from_time', 'ASC')->get()->toArray();
@@ -208,6 +210,7 @@ if (!function_exists('generalSlots')) {
             ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id');
 
         if (!is_null($slot_time)) {
+            $slot_time = Carbon::parse($slot_time)->format('H:i');
             $generalSlot = $generalSlot->where('from_time', $slot_time)->get()->toArray();
         } else {
             $generalSlot = $generalSlot->orderBy('from_time', 'ASC')->get()->toArray();
@@ -266,6 +269,7 @@ if (!function_exists('mealSlots')) {
                 ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id');
 
             if (!is_null($slot_time)) {
+                $slot_time = ltrim($slot_time, "0");
                 $dateCurrentDayMealSlots = $dateCurrentDayMealSlots->where('from_time', $slot_time)->get()->toArray();
             } else {
                 $dateCurrentDayMealSlots = $dateCurrentDayMealSlots->orderBy('from_time', 'ASC')->get()->toArray();
@@ -1026,7 +1030,7 @@ function checkSlotMealAvailable($store_slug, $specific_date, $person, $slot, $sl
         ->where('is_week_day_meal', 0)
         ->count();
     /***** 88888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888 *****/
-    if ($isSlotModifiedAvailable > 0 && ($slot_model == 'StoreSlotModified')) {
+    if ($isSlotModifiedAvailable > 0 && ($slot_model == 'StoreSlotModified' || empty($slot_model))) {
         $dateMealSlotsData = StoreSlotModified::query()
             ->where('store_id', $store_id)
             ->where('is_day_meal', 0)
@@ -1124,6 +1128,7 @@ function checkSlotMealAvailable($store_slug, $specific_date, $person, $slot, $sl
                     ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id');
 
                 if (!empty($slot_time)) {
+                    $slot_time = ltrim($slot_time, "0");
                     $slotData = $getDateDayMealSlots->where('from_time', $slot_time)->get()->toArray();
                 } else {
                     $slotData = $getDateDayMealSlots->orderBy('from_time', 'ASC')->get()->toArray();
@@ -1145,6 +1150,7 @@ function checkSlotMealAvailable($store_slug, $specific_date, $person, $slot, $sl
                 ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id');
 
             if (!empty($slot_time)) {
+                $slot_time = ltrim($slot_time, "0");
                 $daySlot = $daySlot->where('from_time', $slot_time)->get()->toArray();
             } else {
                 $daySlot = $daySlot->orderBy('from_time', 'ASC')->get()->toArray();
@@ -1152,13 +1158,20 @@ function checkSlotMealAvailable($store_slug, $specific_date, $person, $slot, $sl
             $onSlotAvailableAllMealID = collect($daySlot)->pluck('meal_id')->toArray();
 
             //For Meal + Specific Day Remove Specific Day meal
-            $uniqueAvailableMealID = array_values(array_diff($onSlotAvailableAllMealID,$storeWeekMeal));
-            $onSlotAvailableAllMealID = $uniqueAvailableMealID;
-
+            if(!empty($storeWeekMeal)) {
+                $uniqueAvailableMealID = array_values(array_diff($onSlotAvailableAllMealID, array_unique($storeWeekMeal)));
+                $onSlotAvailableAllMealID = $uniqueAvailableMealID;
+            }
+            $collectMealID = collect($dateDayMealSlots)->pluck('meal_id')->toArray();
             if(empty($onSlotAvailableAllMealID)){
-                $onSlotAvailableAllMealID = collect($dateDayMealSlots)->pluck('meal_id')->toArray();
+                $onSlotAvailableAllMealID = array_unique($collectMealID);
             } else {
-                $onSlotAvailableAllMealID = array_unique(array_merge($onSlotAvailableAllMealID, collect($dateDayMealSlots)->pluck('meal_id')->toArray()));
+                if(!empty($collectMealID)) {
+                    $onSlotAvailableAllMealID = array_unique(array_merge($onSlotAvailableAllMealID, collect($dateDayMealSlots)->pluck('meal_id')->toArray()));
+                }else{
+                    $uniqueAvailableMealID = array_values(array_diff($onSlotAvailableAllMealID, array_unique($storeWeekMeal)));
+                    $onSlotAvailableAllMealID = $uniqueAvailableMealID;
+                }
             }
             Log::info("on Specific Day + Meal Slot meal " , [$onSlotAvailableAllMealID]);
         }else{
@@ -1193,6 +1206,7 @@ function checkSlotMealAvailable($store_slug, $specific_date, $person, $slot, $sl
                     ->get();
 
                 if (!empty($slot_time)) {
+                    $slot_time = ltrim($slot_time, "0");
                     $slotData = collect($getDateDayMealSlots)->where('from_time', $slot_time)->pluck('meal_id')->toArray();
                 } else {
                     $slotData = collect($getDateDayMealSlots)->pluck('meal_id')->toArray();
@@ -1218,6 +1232,7 @@ function checkSlotMealAvailable($store_slug, $specific_date, $person, $slot, $sl
                 ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id');
 
             if (!empty($slot_time)) {
+                $slot_time = Carbon::parse($slot_time)->format('H:i');
                 $generalSlot = $generalSlot->where('from_time', $slot_time)->get()->toArray();
             } else {
                 $generalSlot = $generalSlot->orderBy('from_time', 'ASC')->get()->toArray();
@@ -1247,7 +1262,7 @@ function checkSlotMealAvailable($store_slug, $specific_date, $person, $slot, $sl
             Log::info("on Meal + General Slot meal " , [$onSlotAvailableAllMealID]);
         }
     }
-    if(empty($onSlotAvailableAllMealID)){
+    if(empty($onSlotAvailableAllMealID) && ($isSlotModifiedAvailable == 0 && empty($dayCheck)) && ($slot_model != 'StoreSlotModified')){
         //General Slots
         $generalSlot = StoreSlot::query()
             ->where('store_id', $store_id)
@@ -1258,6 +1273,7 @@ function checkSlotMealAvailable($store_slug, $specific_date, $person, $slot, $sl
             ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id');
 
         if (!empty($slot_time)) {
+            $slot_time = Carbon::parse($slot_time)->format('H:i');
             $generalSlot = $generalSlot->where('from_time', $slot_time)->get()->toArray();
         } else {
             $generalSlot = $generalSlot->orderBy('from_time', 'ASC')->get()->toArray();
@@ -1310,6 +1326,7 @@ function checkSlotMealAvailable($store_slug, $specific_date, $person, $slot, $sl
             ->select('id', 'is_slot_disabled', 'from_time', 'max_entries', 'meal_id');
 
         if (!empty($slot_time)) {
+            $slot_time = Carbon::parse($slot_time)->format('H:i');
             $generalSlot= $generalSlot->where('from_time', $slot_time)->get()->toArray();
         } else {
             $generalSlot = $generalSlot->orderBy('from_time', 'ASC')->get()->toArray();
