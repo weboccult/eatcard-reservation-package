@@ -139,7 +139,7 @@ if (!function_exists('specificDateSlots')) {
             if ($dateDayMealSlots == null) {
                 $dateDayMealSlots = [];
             } else {
-                if(!empty($dateMealSlotsData)){
+                if(!empty($dateMealSlotsData) || !empty($dateDayMealSlots)){
                     $dateMealSlotsData = superUnique($dateDayMealSlots, 'from_time');
                 }else{
                     $generalSlot = array_merge($generalSlot,$dateDayMealSlots);
@@ -1315,9 +1315,6 @@ function checkSlotMealAvailable($store_slug, $specific_date, $person, $slot, $sl
         } else {
             $specificDateOnMeal = $dateMealSlotsData->pluck('meal_id')->toArray();
         }
-        if (isset($specificDateOnMeal)) {
-            $specificDateOnMealStore = $specificDateOnMeal;
-        }
 
         //General Slots
         $generalSlot = StoreSlot::query()
@@ -1347,6 +1344,8 @@ function checkSlotMealAvailable($store_slug, $specific_date, $person, $slot, $sl
         } else {
             if (!empty($specificDateOnMealStore)) {
                 $onSlotAvailableAllMealID = array_unique(array_merge($onSlotAvailableAllMealID, $specificDateOnMealStore));
+            }elseif (!empty($specificDateOnMeal)){
+                $onSlotAvailableAllMealID = array_unique($specificDateOnMeal);
             } else {
                 $uniqueAvailableMealID = array_values(array_diff($onSlotAvailableAllMealID, $storeIsMeal));
                 $onSlotAvailableAllMealID = $uniqueAvailableMealID;
